@@ -73,6 +73,15 @@ TEST(MoveTestDeathTest, DefaultConstructor)
 	EXPECT_FALSE(defmv.is_promotion());
 }
 
+//still need to check construction of en passant and castling
+TEST(MoveTestDeathTest, StringConstructor)
+{
+	auto pos = chess::Position::std_start();
+	string name = "Pe2-e4";
+	chess::Move mv(pos, name);
+	EXPECT_EQ((string) mv, name);
+}
+
 TEST(MoveTestDeathTest, SetCastling)
 {
 	chess::Move mv(chess::Square("a1"), chess::Square("a2"),
@@ -143,14 +152,27 @@ TEST(MoveTestDeathTest, SetEnPassant)
 	EXPECT_DEATH(mv4.set_en_passant(), ""); //must capture a pawn
 }
 
-TEST(PositionTest, PrevMove)
+TEST(MoveTestDeathTest, StringOperator)
 {
-	chess::Position defpos;
-	EXPECT_EQ(defpos.prev_move(), nullopt);
+	chess::Move mv(chess::Square("e2"), chess::Square("e4"),
+		chess::Piece {chess::Alignment::White, chess::Piece::Type::Pawn}, chess::Piece());
+	EXPECT_EQ((string) mv, "Pe2-e4");
+}
+
+TEST(PositionTest, FenConstruction)
+{
+	chess::Position pos("r3kb1r/1bq2ppp/p1kppk2/8/1p1NP3/P1N1BP2/1PPQB1PP/2KR3R w kq - 0 12");
+	cerr << pos << endl;
+	EXPECT_EQ(pos.as_fen(), "r3kb1r/1bq2ppp/p1kppk2/8/1p1NP3/P1N1BP2/1PPQB1PP/2KR3R w kq - 0 12");
+}
+
+TEST(PositionTest, ToMove)
+{
+	chess::Position defpos = chess::Position::std_start();
 	EXPECT_EQ(defpos.to_move(), chess::Alignment::White);
 	chess::Move mv(chess::Square("e2"), chess::Square("e4"),
 		chess::Piece {chess::Alignment::White, chess::Piece::Type::Pawn}, chess::Piece());
-	defpos.set_prev_move(make_optional<chess::Move>(mv));
+	defpos = chess::Position(defpos, mv);
 	EXPECT_EQ(defpos.to_move(), chess::Alignment::Black);
 }
 
@@ -172,4 +194,25 @@ TEST(PositionTest, CastleFlags)
 	EXPECT_FALSE(pos.can_castle(a, s));
 	pos.mut_castle(a, s) = true;
 	EXPECT_TRUE(pos.can_castle(a, s));
+}
+
+TEST(PositionTest, AsFen)
+{
+	auto pos = chess::Position::std_start();
+	EXPECT_EQ(pos.as_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+}
+
+TEST(PositionTest, AsFenOpening)
+{
+	auto pos = chess::Position::std_start();
+	EXPECT_EQ(pos.as_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+	chess::Move mv1(pos, "Pe2-e4");
+	pos = chess::Position(pos, mv1);
+	EXPECT_EQ(pos.as_fen(), "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
+	chess::Move mv2(pos, "Pc7-c5");
+	pos = chess::Position(pos, mv2);
+	EXPECT_EQ(pos.as_fen(), "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2");
+	chess::Move mv3(pos, "Ng1-f3");
+	pos = chess::Position(pos, mv3);
+	EXPECT_EQ(pos.as_fen(), "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2");
 }

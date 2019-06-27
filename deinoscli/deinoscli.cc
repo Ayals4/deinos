@@ -1,16 +1,22 @@
 #include <iostream>
 #include <string>
+#include <chrono>
+#include <thread>
 #include "deinos/chess.h"
 #include "deinos/algorithm.h"
 using namespace std;
+using namespace chess;
+using namespace algorithm;
+using namespace std::chrono_literals;
+using std::chrono::system_clock;
 
 int main() {
-	chess::Position pos = chess::Position::std_start();
-	algorithm::RandomEngine rengine;
-	algorithm::Engine& engine = rengine;
+	//chess::Position pos = chess::Position::std_start();
+	//algorithm::RandomEngine rengine;
+	//algorithm::Engine& engine = rengine;
 
-	algorithm::AnalysedPosition ap(pos);
-	cout << endl << ap << endl;
+	//algorithm::AnalysedPosition ap(pos);
+	//cout << endl << ap << endl;
 	/*cout << pos.as_fen() << endl;
 	while (true) {
 		chess::Move move;
@@ -48,7 +54,7 @@ int main() {
 		}
 	}*/
 
-	chess::Position new_pos;
+	/*chess::Position new_pos;
 	new_pos["a2"] = chess::Piece(chess::Alignment::Black, chess::Piece::Type::King);
 	new_pos["b7"] = chess::Piece(chess::Alignment::White, chess::Piece::Type::King);
 	new_pos["b3"] = chess::Piece(chess::Alignment::White, chess::Piece::Type::Rook);
@@ -77,6 +83,24 @@ int main() {
 			break;
 		}
 		cout << n->best_move() << endl;
-	}
+	}*/
 	//cout << "best move: " << tree.base->apos->moves()[tree.base->preferred_index()] << endl;
+
+	AnalysedPosition start_pos(Position::std_start());
+	const auto dumb_val = [&] (const AnalysedPosition&) {return 0.5;};
+	const auto dumb_pri = [&] (const AnalysedPosition& ap, const Move&) {return 1.0 / (double) ap.moves().size();};
+	TreeEngine engine(start_pos, dumb_val, dumb_pri, 0.3);
+
+	cout << endl;
+	cout << engine.display() << endl;
+
+	//engine.start();
+	//this_thread::sleep_for(100ms);
+	//bool result = engine.advance_to("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
+	//assert(result);
+	//this_thread::sleep_for(100ms);
+
+	while (engine.total_n() < 1000) this_thread::sleep_for(10ms);
+	
+	cout << engine.display() << endl;
 }

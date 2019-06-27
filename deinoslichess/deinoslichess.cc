@@ -6,15 +6,20 @@
 using namespace std;
 using namespace chess;
 using namespace algorithm;
+using namespace std::chrono_literals;
+using std::chrono::system_clock;
 
 int main() {
-	RandomEngine reng;
-	Engine& engine = reng;
+	const auto dumb_val = [&] (const AnalysedPosition&) {return 0.5;};
+	const auto dumb_pri = [&] (const AnalysedPosition& ap, const Move&) {return 1.0 / (double) ap.moves().size();};
+
+	AnalysedPosition apos(Position::std_start());
+	auto engine = make_unique<TreeEngine>(apos, dumb_val, dumb_pri, 0.2);
 	while (true) {
 		//cerr << engine.apos();
 		string input;
 		getline(cin, input);
-		//cerr << input << endl;
+		cerr << input << endl;
 		if (input == "ping 123") {
 			//cerr << "PING ACKNOWLEDGED" << endl;
 			cout << "pong 123" << endl;
@@ -22,8 +27,28 @@ int main() {
 		if (input == "quit") {
 			break;
 		}
+		if (input == "go") {
+			cerr << "GO ACKNOWLEDGED" << endl;
+			this_thread::sleep_for(5000ms);
+			cerr << engine->display();
+			Move to_make = engine->choose_move();
+			cout << "move " << to_make.to_xboard() << endl;
+			//engine.force_move(to_make);
+		}
+		
 		stringstream ss(input);
-		vector<string> words;
+		string word1;
+		ss >> word1;
+		if (word1 == "setboard") {
+			string fen;
+			getline(ss, fen);
+			//cerr << "FEN: " << fen << endl;
+			if (!engine->advance_to(fen)) {
+				engine.reset(new TreeEngine(AnalysedPosition(Position(fen)), dumb_val, dumb_pri, 0.2));
+				cerr << "ENGINE RESET: position not recognised" << endl;
+			}
+		}
+		/*vector<string> words;
 		string word;
 		while(std::getline(ss, word, ' ')) {
 			words.push_back(word);
@@ -39,12 +64,6 @@ int main() {
 				engine.force_move(to_make.value());
 			}
 			else cerr << " : " << "MOVE NOT FOUND" << endl;
-		}
-		if (input == "go") {
-			//cerr << "GO ACKNOWLEDGED" << endl;
-			Move to_make = engine.best_move();
-			cout << "move " << to_make.to_xboard() << endl;
-			engine.force_move(to_make);
-		}
+		}*/
 	}
 }

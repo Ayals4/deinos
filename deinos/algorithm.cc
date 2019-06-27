@@ -2,6 +2,8 @@
 #include <memory>
 #include <cmath>
 #include <sstream>
+#include <thread>
+#include <chrono>
 using namespace std;
 using namespace chess;
 using namespace algorithm;
@@ -30,7 +32,13 @@ void calculate_moves(const Position& pos, vector<Move>& output,
 	const auto register_control = [&](Square s_end)
 	{
 		ctrl_out[s_end.file()][s_end.rank()] += 1;
-	}; 
+	};
+
+	const auto register_en_passant = [&](Square s_end)
+	{
+		output.push_back(Move(start, s_end, moved, Piece(!to_move, Piece::Type::Pawn)));
+		output.back().set_en_passant();
+	};
 
 	constexpr array<pair<int, int>, 4> knight_tmpl1 = {
 		make_pair(1, 2), make_pair(-1, 2), make_pair(1, -2), make_pair(-1, -2)};
@@ -58,7 +66,7 @@ void calculate_moves(const Position& pos, vector<Move>& output,
 	switch (moved.type) {
 		case Piece::Type::Empty: break;
 		
-		case Piece::Type::Pawn: { //TODO: en passant, promotion
+		case Piece::Type::Pawn: {
 			const int mvdir = (to_move == Alignment::White ? 1 : -1);
 			const int init_rnk = (to_move == Alignment::White ? 1 : 6);
 			const int pr_rnk = (to_move == Alignment::White ? 6 : 1);
@@ -74,6 +82,10 @@ void calculate_moves(const Position& pos, vector<Move>& output,
 				}
 				else {
 					register_control(new_s.value());
+					if(pos.en_passant_target() && new_s.value() == pos.en_passant_target().value()) { //handle en_passant
+						register_en_passant(new_s.value());
+						continue;
+					}
 					if (capt.type == Piece::Type::Empty || capt.alignment == to_move) continue;
 				}
 				if (can_pr) register_promotion(new_s.value());
@@ -152,8 +164,8 @@ void calculate_castling(const AnalysedPosition& apos, vector<Move>& output, Alig
 	}
 }
 
-void handle_en_passant(const Position& pos, vector<Move>& output, std::array<std::array<int, 8>, 8>& ctrl_out) {
-	if (!pos.prev_move()) return;
+void handle_en_passant(const Position& pos, vector<Move>& output, std::array<std::array<int, 8>, 8>& ctrl_out) { //TODO
+	/*if (!pos.prev_move()) return;
 	const Move& prev_move = pos.prev_move().value();
 	if (prev_move.moved_piece().type != Piece::Type::Pawn) return;
 	const int delta_rank = prev_move.final_square().rank() - prev_move.initial_square().rank();
@@ -179,7 +191,7 @@ void handle_en_passant(const Position& pos, vector<Move>& output, std::array<std
 			Piece(!to_move, Piece::Type::Pawn)));
 		output.back().set_en_passant();
 		ctrl_out[s_end.file()][s_end.rank()] += 1;
-	}
+	}*/
 }
 
 algorithm::AnalysedPosition::AnalysedPosition(const chess::Position& t_pos)
@@ -190,8 +202,8 @@ algorithm::AnalysedPosition::AnalysedPosition(const chess::Position& t_pos)
 		calculate_moves(t_pos, m_moves[index], m_control[index], s);
 		if (m_position[s].type == Piece::Type::King) m_king_sq[index] = s;
 	}
-	const int index = (int) t_pos.to_move();
-	handle_en_passant(t_pos, m_moves[index], m_control[index]);
+	//const int index = (int) t_pos.to_move();
+	//handle_en_passant(t_pos, m_moves[index], m_control[index]);
 	calculate_castling(*this, m_moves[0], Alignment::White);
 	calculate_castling(*this, m_moves[1], Alignment::Black);
 }
@@ -207,8 +219,8 @@ ostream& algorithm::operator<<(ostream& os, const AnalysedPosition& ap)
 	os << "" << (ap.pos().can_castle(b,k) ? "Y" : "N") << " ";
 	os << "" << (ap.pos().can_castle(b,q) ? "Y" : "N") << " ";
 	os << "    Prev: ";
-	if (ap.pos().prev_move()) os << ap.pos().prev_move().value();
-	else os << "None  ";
+	//if (ap.pos().prev_move()) os << ap.pos().prev_move().value();
+	os << "???   ";
 	os << "     To Move: " << (ap.pos().to_move() == Alignment::White ? "White" : "Black") << endl;
 	
 	constexpr const char* hline = "-------------------------------------------------";
@@ -238,18 +250,8 @@ ostream& algorithm::operator<<(ostream& os, const AnalysedPosition& ap)
 	return os;
 }
 
-optional<double> get_result(const AnalysedPosition& apos) {
-	const Alignment to_move = apos.pos().to_move();
-	const Square enemy_king_sq = apos.king_sq(!to_move);
-	if (apos.ctrl(to_move, enemy_king_sq) > 0) {
-		return make_optional<double>(to_move == Alignment::White ? 1.0 : 0.0);
-	}
-	else return nullopt;
-}
-
-algorithm::Node::Node(AnalysedPosition&& t_apos)
-	: apos(make_unique<AnalysedPosition>(t_apos)),
-	result(get_result(*apos)),
+algorithm::Node::Node(unique_ptr<const AnalysedPosition> t_apos)
+	: apos(move(t_apos)),
 	white_to_play(apos->pos().to_move() == Alignment::White),
 	data(apos->moves().size()),
 	edges(vector<Edge>(apos->moves().size()))
@@ -257,14 +259,13 @@ algorithm::Node::Node(AnalysedPosition&& t_apos)
 
 algorithm::Node::Node(const AnalysedPosition& t_apos)
 	: apos(make_unique<AnalysedPosition>(t_apos)),
-	result(get_result(*apos)),
 	white_to_play(apos->pos().to_move() == Alignment::White),
 	data(apos->moves().size()),
 	edges(vector<Edge>(apos->moves().size()))
 	{
 	}
 
-variant<Node*, double> algorithm::Node::follow(int index, function<double(const AnalysedPosition&)> value_fn) {
+/*variant<Node*, double> algorithm::Node::follow(int index, function<double(const AnalysedPosition&)> value_fn) {
 	edges[index].ptr_mutex.lock();
 	if (edges[index].node != nullptr) {
 		edges[index].ptr_mutex.unlock();
@@ -286,7 +287,7 @@ void algorithm::Node::update(int index, double t_value) {
 	data.edges[index].visits += 1;
 	data.edges[index].total_value += t_value;
 	data_mutex.unlock();
-}
+}*/
 
 void algorithm::Node::increment_n() {
 	data_mutex.lock();
@@ -294,7 +295,8 @@ void algorithm::Node::increment_n() {
 	data_mutex.unlock();
 }
 
-int algorithm::Node::preferred_index() {
+int algorithm::Node::preferred_index()
+{
 	unsigned int i = 0;
 	int max_n = data.edges[0].visits;
 	unsigned int max_loc = 0;
@@ -308,81 +310,269 @@ int algorithm::Node::preferred_index() {
 	return (int) max_loc;
 }
 
-const Move& algorithm::Node::best_move() {
-	return apos->moves()[preferred_index()];
+unique_ptr<Node>* algorithm::Node::find_child(const std::string& fen)
+{
+	for (auto& edge : edges) {
+		if (edge.node) {
+			if (edge.node->apos->pos().as_fen() == fen) {
+				return &edge.node;
+			}
+		}
+	}
+	return nullptr;
 }
 
-int algorithm::Node::to_search() { //need to make change with alignment TODO
+//const Move& algorithm::Node::best_move() {
+//	return apos->moves()[preferred_index()];
+//}
+
+optional<int> algorithm::Tree::edge_to_search(Node& node) { //need to make change with alignment TODO
 	const auto evaluate = [&](const EdgeDatum& ed) {
+		if (!ed.legal) return -1.0;
 		const double avg_val = ed.total_value / ((double) ed.visits + 0.01);
-		const double oriented_val = (white_to_play ? avg_val : 1.0 - avg_val);
-		const double expl = 0.5 * sqrt(data.total_n) / (1 + ed.visits);
+		const double oriented_val = (node.white_to_play ? avg_val : 1.0 - avg_val);
+		const double expl = expl_c * sqrt(node.data.total_n) / (1 + ed.visits);
 		return oriented_val + expl;
 	};
 
-	data_mutex.lock();
-	const auto& vec = data.edges;
+	node.data_mutex.lock();
+	const auto& vec = node.data.edges;
 	unsigned int i = 0;
 	unsigned int max_pos = i;
 	double max_eval = evaluate(vec[i]);
 	i++;
-	for (; i < data.edges.size(); i++) {
-		const double new_eval = evaluate(data.edges[i]);
+	for (; i < vec.size(); i++) {
+		const double new_eval = evaluate(vec[i]);
 		if (new_eval > max_eval) {
 			max_pos = i;
 			max_eval = new_eval;
 		}
 	}
-	data_mutex.unlock();
-	return (int) max_pos;
+	node.data_mutex.unlock();
+	if (max_eval == -1.0) return nullopt;
+	return make_optional((int) max_pos);
 }
 
-string algorithm::Node::display() const { //use GameResult TODO
+void algorithm::Node::update(int index, double t_value) {
+	data_mutex.lock();
+	data.total_n += 1;
+	data.edges[index].visits += 1;
+	data.edges[index].total_value += t_value;
+	data_mutex.unlock();
+}
+
+void algorithm::Node::set_illegal(int index) {
+	data_mutex.lock();
+	data.edges[index].legal = false;
+	data_mutex.unlock();
+}
+
+string algorithm::Node::display() const
+{ //use GameResult TODO
 	stringstream output;
 	output << apos->pos().as_fen() << endl;
-	output << "Victor: ";
-	if (result) {
-		if (result.value() == 1.0) output << "White" << endl;
-		else if (result.value() == 0.0) output << "Black" << endl;
-		else output << "ERROR" << endl;
-	}
-	else output << "none" << endl;
+	//output << "Victor: ";
+	//if (result) {
+	//	if (result.value() == 1.0) output << "White" << endl;
+	//	else if (result.value() == 0.0) output << "Black" << endl;
+	//	else output << "ERROR" << endl;
+	//}
+	//else output << "none" << endl;
 	output << "Total N: " << data.total_n << endl;
 	for (unsigned int i = 0; i < data.edges.size(); i++) {
 		output << apos->moves()[i] << ": ";
 		output << data.edges[i].visits << " ";
-		output << data.edges[i].total_value / (double) data.edges[i].visits << endl;
+		if (data.edges[i].visits > 0) {
+			output << data.edges[i].total_value / (double) data.edges[i].visits << endl;
+		}
+		else {
+			output << "unknown" << endl;
+		}
 	}
 	return output.str();
 }
 
-double search_node(Node* node, const function<double(const AnalysedPosition&)>& value_fn) {
+/*double search_node(Node* node, const function<double(const AnalysedPosition&)>& value_fn) {
 	if (node->result) {
 		node->increment_n();
 		return node->result.value();
 	}
-	Expects(node->apos->pos().game_result() == nullopt);
+	//Expects(node->apos->pos().game_result() == nullopt);
 	const int index_to_search = node->to_search();
 	const auto follow_result = node->follow(index_to_search, value_fn);
 	const double value = (follow_result.index() == 1 ?
 		get<double>(follow_result) : search_node(get<Node*>(follow_result), value_fn));
 	node->update(index_to_search, value);
 	return value;
+}*/
+
+double algorithm::Tree::evaluate_node(Node& node)
+{
+	//if result determined return
+	if (node.result()) {
+		node.increment_n();
+		return evaluate(node.result().value());
+	}
+
+	//choose edge to search & check for end of game
+	const auto search_res = edge_to_search(node);
+	if (!search_res) {
+		if (node.apos->legal_check()) {
+			node.m_result = make_optional<GameResult>(gmres_victory(!node.apos->pos().to_move()));
+		}
+		else {
+			node.m_result = make_optional<GameResult>(GameResult::Draw);
+		}
+		return evaluate_node(node);
+	}
+	const int index = search_res.value();
+	
+	double evaluation;
+	node.edges[index].ptr_mutex.lock();
+	auto& node_ptr = node.edges[index].node;
+	if (node_ptr) {
+		node.edges[index].ptr_mutex.unlock();
+		evaluation = evaluate_node(*node_ptr);
+	}
+	else {
+		auto new_apos = make_unique<AnalysedPosition>(Position(node.apos->pos(), node.apos->moves()[index]));
+		if (new_apos->illegal_check()) {
+			node.edges[index].ptr_mutex.unlock();
+			node.set_illegal(index);
+			return evaluate_node(node);
+		}
+		else {
+			node_ptr = make_unique<Node>(move(new_apos));;
+			node.edges[index].ptr_mutex.unlock();
+			evaluation = value_fn(*node_ptr->apos);
+		}
+	}
+	node.update(index, evaluation);
+	return evaluation;
 }
 
-void algorithm::Tree::search() {
-	search_node(base.get(), value_fn);
+void algorithm::Tree::search()
+{
+	if (base) evaluate_node(*base);
 }
 
-void algorithm::RandomEngine::force_move(const chess::Move& mv) {
+/*void algorithm::RandomEngine::force_move(const chess::Move& mv)
+{
 	m_apos = AnalysedPosition(Position(m_apos.pos(), mv));
 }
 
-const Move& algorithm::RandomEngine::best_move() const {
+const Move& algorithm::RandomEngine::best_move() const
+{
 	Expects(!m_apos.moves().empty());
 	for (const Move& m : m_apos.moves()) {
 		AnalysedPosition new_apos(Position(m_apos.pos(), m));
 		if (new_apos.ctrl(new_apos.pos().to_move(), new_apos.king_sq(m_apos.pos().to_move())) <= 0) return m;
 	}
 	return m_apos.moves().front();
+}*/
+
+algorithm::TreeEngine::TreeEngine(
+	const AnalysedPosition& t_apos,
+	function<double(const AnalysedPosition&)> t_value_fn,
+	function<double(const AnalysedPosition&, const Move&)> t_prior_fn,
+	double t_expl_c
+)	: m_tree(Tree(t_apos, t_value_fn, t_prior_fn, t_expl_c))
+	//halt_future(halt_promise.get_future())
+{
+	shared_future<void> halt_future(halt_promise.get_future());
+
+	const auto constant_search = [&, halt_future] () {
+		while (halt_future.wait_for(std::chrono::milliseconds(0)) == std::future_status::timeout) {
+			if (should_pause()) {
+				unique_lock<mutex> lk(pause_mx);
+				pause_count++;
+				pause_cv.notify_all();
+				while (pause_bool) pause_cv.wait(lk);
+				pause_count--;
+				pause_cv.notify_all();
+			}
+			if (total_n() > 1000) { //hacky bullshit
+				continue;
+			}
+			for (int i = 0; i < 10; i++) m_tree.search(); //should be 1000
+		}
+	};
+
+	m_threads.emplace_back(constant_search);
+	m_threads.emplace_back(constant_search);
+	m_threads.emplace_back(constant_search);
+	m_threads.emplace_back(constant_search);
+}
+
+/*void algorithm::TreeEngine::start()
+{
+	const auto constant_search = [&] () {
+		while (true) m_tree.search();
+	};
+
+	thread t(constant_search);
+	t.detach();
+	thread t2(constant_search);
+	t2.detach();
+	thread t3(constant_search);
+	t3.detach();
+	thread t4(constant_search);
+	t4.detach();
+	
+	cout << "!engine started!" << endl;
+}*/
+
+const Move& algorithm::TreeEngine::choose_move()
+{
+	return m_tree.base->best_move();
+}
+
+bool algorithm::TreeEngine::advance_to(const string& fen)
+{
+	pause();
+	unique_ptr<Node>* next_ptr = m_tree.base->find_child(fen);
+	if (next_ptr) {
+		m_tree.base = move(*next_ptr);
+		resume();
+		return true;
+	}
+	else {
+		resume();
+		return false;
+	}
+}
+
+string algorithm::TreeEngine::display() const
+{
+	stringstream output;
+	output << "FEN: " << m_tree.base->apos->pos().as_fen() << endl;
+	output << (string) m_tree.base->apos->pos();
+	output << "Best move: " << m_tree.base->best_move() << endl;
+	output << endl;
+	output << m_tree.base->display();
+	return output.str();
+}
+
+bool algorithm::TreeEngine::should_pause()
+{
+	lock_guard<mutex> lk(pause_mx);
+	return pause_bool;
+}
+
+void algorithm::TreeEngine::pause()
+{
+	unique_lock<mutex> lk(pause_mx);
+	pause_bool = true;
+	pause_count = 0;
+	//pause_cv.notify_all();
+	while (pause_count < (int) m_threads.size()) pause_cv.wait(lk);
+}
+
+void algorithm::TreeEngine::resume()
+{
+	unique_lock<mutex> lk(pause_mx);
+	pause_bool = false;
+	assert(pause_count == (int) m_threads.size());
+	pause_cv.notify_all();
+	while (pause_count > 0) pause_cv.wait(lk);
 }

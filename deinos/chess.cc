@@ -1,5 +1,6 @@
 #include "chess.h"
 #include <sstream>
+#include <algorithm>
 using namespace chess;
 using namespace std;
 
@@ -38,9 +39,9 @@ std::ostream& chess::operator<<(std::ostream& os, Piece p)
 optional<Square> chess::Square::translate(int files,int ranks) const
 {
 	const int new_file = m_file + files;
-	if (new_file > 7 || new_file < 0) return optional<Square>();
+	if (new_file > 7 || new_file < 0) return nullopt;
 	const int new_rank = m_rank + ranks;
-	if (new_rank > 7 || new_rank < 0) return optional<Square>();
+	if (new_rank > 7 || new_rank < 0) return nullopt;
 
 	return optional<Square>(Square(new_file, new_rank));
 }
@@ -69,6 +70,40 @@ chess::Move::Move(Square initial, Square final, Piece moved, Piece captured)
 	Expects(m_captured_piece.type == Piece::Type::Empty ||
 		m_captured_piece.alignment != m_moved_piece.alignment);
 }
+
+Square get_initial_sq(const string& name)
+{
+	string sq1(1, name.at(1));
+	string sq2(1, name.at(2));
+	string sq_str = sq1 + sq2;
+	return Square(sq_str.c_str());
+}
+
+Square get_final_sq(const string& name)
+{
+	string sq1(1, name.at(4));
+	string sq2(1, name.at(5));
+	string sq_str = sq1 + sq2;
+	return Square(sq_str.c_str());
+}
+
+Piece get_moved(const Position& pos, const string& name) {
+	return pos[get_initial_sq(name)];
+}
+
+Piece get_captured(const Position& pos, const string& name) {
+	return pos[get_final_sq(name)];
+	//if (name.at(3) == '-') return Piece();
+	//else {
+	//	Piece fsq_piece = pos[get_final_sq(name)];
+	//	if (fsq_piece.type != Piece::Type::Empty) return fsq_piece;
+	//	else return Piece(!pos[get_initial_sq(name)].alignment, Piece::Type::Pawn); //catches en_passant
+	//}
+}
+
+chess::Move::Move(const Position& pos, const string& name)
+	: Move(get_initial_sq(name), get_final_sq(name),
+		get_moved(pos, name), get_captured(pos, name)) {}
 
 void chess::Move::set_castling() {
 	Expects(m_moved_piece.type == Piece::Type::King);
@@ -120,6 +155,13 @@ bool chess::operator!=(const Move& m1, const Move& m2)
 	return !(m1 == m2);
 }
 
+chess::Move::operator string() const
+{
+	stringstream ss;
+	ss << *this;
+	return ss.str();
+}
+
 std::ostream& chess::operator<<(std::ostream& os, const Move& mv)
 {
 	os << mv.moved_piece().type << (string) mv.initial_square();
@@ -138,6 +180,52 @@ optional<Move> chess::find_move(const string& t_name, const vector<Move>& moves)
 		if (name == t_name) return make_optional(m);
 	}
 	return nullopt;
+}
+
+chess::Position::Position(const string& fen)
+{
+	istringstream iss(fen);
+	vector<string> words;
+	for (string word; iss >> word;) words.push_back(word);
+
+	constexpr array<char, 7> white {'_', 'P', 'N', 'B', 'R', 'Q', 'K'};
+	constexpr array<char, 7> black {'_', 'p', 'n', 'b', 'r', 'q', 'k'};
+	
+	stringstream pieces(words[0]);
+	int num_empty = 0;
+	for (int r = 7; r >= 0; --r) {
+		for (int f = 0; f < 8; ++f) {
+			num_empty -= 1;
+			if (num_empty > 0) continue;
+			
+			char next_char;
+			pieces >> next_char;
+			int loc_w = distance(begin(white), find(begin(white), end(white), next_char));
+			if (loc_w < 7) { m_board[f][r] = Piece(Alignment::White, (Piece::Type) loc_w); continue; }
+			int loc_b = distance(begin(black), find(begin(black), end(black), next_char));
+			if (loc_b < 7) { m_board[f][r] = Piece(Alignment::Black, (Piece::Type) loc_b); continue; }
+			stringstream(string(1, next_char)) >> num_empty; //read int
+		}
+		if (r > 0) {
+			char discard;
+			pieces >> discard;
+			//assert(discard == '/');
+		}
+	}
+	
+	m_to_move = (words[1] == "w" ? Alignment::White : Alignment::Black);
+	
+	for (const char& c : words[2]) {
+		if (c == 'K') mut_castle(Alignment::White, Side::Kingside) = true;
+		if (c == 'Q') mut_castle(Alignment::White, Side::Queenside) = true;
+		if (c == 'k') mut_castle(Alignment::Black, Side::Kingside) = true;
+		if (c == 'q') mut_castle(Alignment::Black, Side::Queenside) = true;
+	}
+	
+	m_en_passant_target = (words[3] == "-" ? nullopt : make_optional<Square>(words[3].c_str()));
+	
+	stringstream(words[4]) >> m_hm_clock;
+	stringstream(words[5]) >> m_fm_count;
 }
 
 void apply_castling(Position& pos, const Move& mv) {
@@ -165,12 +253,18 @@ void apply_promotion(Position& pos, const Move& mv) {
 }
 
 chess::Position::Position(const Position& t_pos, const Move& mv)
-	: m_prev_move(optional<Move>(mv)), m_board(t_pos.m_board), m_castle(t_pos.m_castle)
+	: m_to_move(!mv.moved_piece().alignment), m_board(t_pos.m_board), m_castle(t_pos.m_castle),
+	m_hm_clock(t_pos.m_hm_clock + 1), m_fm_count(t_pos.m_fm_count)
 {
-	Expects(t_pos.game_result() == nullopt);
+	//Expects(t_pos.game_result() == nullopt);
 	Expects(t_pos.to_move() == mv.moved_piece().alignment);
 	Expects(t_pos[mv.initial_square()] == mv.moved_piece());
 	if (!mv.is_en_passant()) Expects(t_pos[mv.final_square()] == mv.captured_piece());
+
+	//handle move clocks
+	if(to_move() == Alignment::White) m_fm_count += 1;
+	if(mv.captured_piece().type != Piece::Type::Empty) m_hm_clock = 0;
+	if(mv.moved_piece().type == Piece::Type::Pawn) m_hm_clock = 0;
 
 	if (mv.is_castling()) {
 		apply_castling(*this, mv);
@@ -184,12 +278,6 @@ chess::Position::Position(const Position& t_pos, const Move& mv)
 	else {
 		(*this)[mv.final_square()] = (*this)[mv.initial_square()];
 		(*this)[mv.initial_square()] = Piece();
-	}
-
-	//check for end of game
-	if (mv.captured_piece().type == Piece::Type::King){
-		if (t_pos.to_move() == Alignment::White) m_result = GameResult::White;
-		else m_result = GameResult::Black;
 	}
 
 	//check to disable castling
@@ -214,6 +302,13 @@ chess::Position::Position(const Position& t_pos, const Move& mv)
 		if (can_castle(!t_pos.to_move(), Side::Kingside) && mv.final_square().file() == 7) {
 			mut_castle(!t_pos.to_move(), Side::Kingside) = false;
 		}
+	}
+
+	//create en_passant_target
+	if (mv.moved_piece().type == Piece::Type::Pawn) {
+		const int rank_gap = mv.final_square().rank() - mv.initial_square().rank();
+		if (rank_gap == 2) m_en_passant_target = mv.initial_square().translate(0,1);
+		if (rank_gap == -2) m_en_passant_target = mv.initial_square().translate(0,-1);
 	}
 }
 
@@ -259,6 +354,23 @@ string chess::Position::as_fen() const
 		}
 		if (r != 0) output += '/';
 	}
+
+	output += (to_move() == Alignment::White ? " w" : " b");
+
+	output += ' ';
+	if (can_castle(Alignment::White, Side::Kingside)) output += 'K';
+	if (can_castle(Alignment::White, Side::Queenside)) output += 'Q';
+	if (can_castle(Alignment::Black, Side::Kingside)) output += 'k';
+	if (can_castle(Alignment::Black, Side::Queenside)) output += 'q';
+
+	output += ' ';
+	if(en_passant_target()) output += (string) en_passant_target().value();
+	else output += '-';
+
+	output += ' ';
+	output += to_string(hm_clock());
+	output += ' ';
+	output += to_string(fm_count());
 	
 	return output;
 }
@@ -266,13 +378,21 @@ string chess::Position::as_fen() const
 bool chess::operator==(const Position& p1, const Position& p2)
 {
 	return (p1.m_board == p2.m_board &&
-		p1.m_prev_move == p2.m_prev_move &&
+		p1.m_to_move == p2.m_to_move &&
+		p1.m_en_passant_target == p2.m_en_passant_target &&
 		p1.m_castle == p2.m_castle);
 }
 
 bool chess::operator!=(const Position& p1, const Position& p2)
 {
 	return !(p1 == p2);
+}
+
+chess::Position::operator string() const
+{
+	stringstream ss;
+	ss << *this;
+	return ss.str();
 }
 
 std::ostream& chess::operator<<(std::ostream& os, const Position& pos)

@@ -2,6 +2,7 @@ cc_library(
 	name = "deinos",
 	srcs = ["chess.cc", "algorithm.cc"],
 	hdrs = ["chess.h", "algorithm.h"],
+	linkopts = ["-pthread"],
 	visibility = ["//deinoscli:__pkg__", "//deinoslichess:__pkg__"],
 	deps = [
 		"@gsl//:gsl",
