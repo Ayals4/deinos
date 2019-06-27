@@ -39,12 +39,12 @@ namespace algorithm {
 	class Node;
 	
 	struct Edge {
-		std::mutex ptr_mutex;
+		//std::mutex ptr_mutex;
 		std::unique_ptr<Node> node = nullptr;
 	};
 
 	struct EdgeDatum {
-		double total_value = 0.0;
+		float total_value = 0.0;
 		int visits = 0;
 		bool legal = true;
 	};
@@ -73,7 +73,7 @@ namespace algorithm {
 		const bool white_to_play;
 		
 	private:
-		void update(int index, double t_value);
+		void update(int index, float t_value);
 		void increment_n();
 		void set_illegal(int index);
 	
@@ -88,18 +88,18 @@ namespace algorithm {
 
 	class Tree {
 	public:
-		Tree(const AnalysedPosition& base_apos, std::function<double(const AnalysedPosition&)> t_value_fn,
-			std::function<double(const AnalysedPosition&, const chess::Move&)> t_prior_fn, double t_expl_c = 0.2)			
+		Tree(const AnalysedPosition& base_apos, std::function<float(const AnalysedPosition&)> t_value_fn,
+			std::function<float(const AnalysedPosition&, const chess::Move&)> t_prior_fn, float t_expl_c = 0.2)			
 			: base(std::make_unique<Node>(base_apos)), value_fn(t_value_fn), prior_fn(t_prior_fn), expl_c(t_expl_c) {}
 		void search();
 		std::unique_ptr<Node> base;
-		std::function<double(const AnalysedPosition&)> value_fn;
-		std::function<double(const AnalysedPosition&, const chess::Move&)> prior_fn;
-		double expl_c = 0.2; //exploration coefficient
+		std::function<float(const AnalysedPosition&)> value_fn;
+		std::function<float(const AnalysedPosition&, const chess::Move&)> prior_fn;
+		float expl_c = 0.2; //exploration coefficient
 
 	private:
-		double evaluate_node(Node& node); //used in search() for recursion
-		void update_node(int index, double t_value);
+		float evaluate_node(Node& node); //used in search() for recursion
+		void update_node(int index, float t_value);
 		std::optional<int> edge_to_search(Node& node);
 	};
 
@@ -141,9 +141,9 @@ namespace algorithm {
 	public:
 		TreeEngine(
 			const AnalysedPosition& initial_position,
-			std::function<double(const AnalysedPosition&)> t_value_fn,
-			std::function<double(const AnalysedPosition&, const chess::Move&)> t_prior_fn,
-			double exploration_coefficient);
+			std::function<float(const AnalysedPosition&)> t_value_fn,
+			std::function<float(const AnalysedPosition&, const chess::Move&)> t_prior_fn,
+			float exploration_coefficient);
 
 		~TreeEngine() {
 			halt_promise.set_value();

@@ -328,10 +328,10 @@ unique_ptr<Node>* algorithm::Node::find_child(const std::string& fen)
 
 optional<int> algorithm::Tree::edge_to_search(Node& node) { //need to make change with alignment TODO
 	const auto evaluate = [&](const EdgeDatum& ed) {
-		if (!ed.legal) return -1.0;
-		const double avg_val = ed.total_value / ((double) ed.visits + 0.01);
-		const double oriented_val = (node.white_to_play ? avg_val : 1.0 - avg_val);
-		const double expl = expl_c * sqrt(node.data.total_n) / (1 + ed.visits);
+		if (!ed.legal) return -1.0f;
+		const float avg_val = ed.total_value / ((float) ed.visits + 0.01f);
+		const float oriented_val = (node.white_to_play ? avg_val : 1.0f - avg_val);
+		const float expl = expl_c * sqrt(node.data.total_n) / (1 + ed.visits);
 		return oriented_val + expl;
 	};
 
@@ -339,10 +339,10 @@ optional<int> algorithm::Tree::edge_to_search(Node& node) { //need to make chang
 	const auto& vec = node.data.edges;
 	unsigned int i = 0;
 	unsigned int max_pos = i;
-	double max_eval = evaluate(vec[i]);
+	float max_eval = evaluate(vec[i]);
 	i++;
 	for (; i < vec.size(); i++) {
-		const double new_eval = evaluate(vec[i]);
+		const float new_eval = evaluate(vec[i]);
 		if (new_eval > max_eval) {
 			max_pos = i;
 			max_eval = new_eval;
@@ -353,7 +353,7 @@ optional<int> algorithm::Tree::edge_to_search(Node& node) { //need to make chang
 	return make_optional((int) max_pos);
 }
 
-void algorithm::Node::update(int index, double t_value) {
+void algorithm::Node::update(int index, float t_value) {
 	data_mutex.lock();
 	data.total_n += 1;
 	data.edges[index].visits += 1;
@@ -383,7 +383,7 @@ string algorithm::Node::display() const
 		output << apos->moves()[i] << ": ";
 		output << data.edges[i].visits << " ";
 		if (data.edges[i].visits > 0) {
-			output << data.edges[i].total_value / (double) data.edges[i].visits << endl;
+			output << data.edges[i].total_value / (float) data.edges[i].visits << endl;
 		}
 		else {
 			output << "unknown" << endl;
@@ -406,7 +406,7 @@ string algorithm::Node::display() const
 	return value;
 }*/
 
-double algorithm::Tree::evaluate_node(Node& node)
+float algorithm::Tree::evaluate_node(Node& node)
 {
 	//if result determined return
 	if (node.result()) {
@@ -427,23 +427,27 @@ double algorithm::Tree::evaluate_node(Node& node)
 	}
 	const int index = search_res.value();
 	
-	double evaluation;
-	node.edges[index].ptr_mutex.lock();
+	float evaluation;
+	//node.edges[index].ptr_mutex.lock();
+	node.data_mutex.lock();
 	auto& node_ptr = node.edges[index].node;
 	if (node_ptr) {
-		node.edges[index].ptr_mutex.unlock();
+		//node.edges[index].ptr_mutex.unlock();
+		node.data_mutex.unlock();
 		evaluation = evaluate_node(*node_ptr);
 	}
 	else {
 		auto new_apos = make_unique<AnalysedPosition>(Position(node.apos->pos(), node.apos->moves()[index]));
 		if (new_apos->illegal_check()) {
-			node.edges[index].ptr_mutex.unlock();
+			//node.edges[index].ptr_mutex.unlock();
+			node.data_mutex.unlock();
 			node.set_illegal(index);
 			return evaluate_node(node);
 		}
 		else {
 			node_ptr = make_unique<Node>(move(new_apos));;
-			node.edges[index].ptr_mutex.unlock();
+			//node.edges[index].ptr_mutex.unlock();
+			node.data_mutex.unlock();
 			evaluation = value_fn(*node_ptr->apos);
 		}
 	}
@@ -473,9 +477,9 @@ const Move& algorithm::RandomEngine::best_move() const
 
 algorithm::TreeEngine::TreeEngine(
 	const AnalysedPosition& t_apos,
-	function<double(const AnalysedPosition&)> t_value_fn,
-	function<double(const AnalysedPosition&, const Move&)> t_prior_fn,
-	double t_expl_c
+	function<float(const AnalysedPosition&)> t_value_fn,
+	function<float(const AnalysedPosition&, const Move&)> t_prior_fn,
+	float t_expl_c
 )	: m_tree(Tree(t_apos, t_value_fn, t_prior_fn, t_expl_c))
 	//halt_future(halt_promise.get_future())
 {

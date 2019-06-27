@@ -88,7 +88,7 @@ int main() {
 
 	AnalysedPosition start_pos(Position::std_start());
 	const auto dumb_val = [&] (const AnalysedPosition&) {return 0.5;};
-	const auto dumb_pri = [&] (const AnalysedPosition& ap, const Move&) {return 1.0 / (double) ap.moves().size();};
+	const auto dumb_pri = [&] (const AnalysedPosition& ap, const Move&) {return 1.0 / (float) ap.moves().size();};
 	TreeEngine engine(start_pos, dumb_val, dumb_pri, 0.3);
 
 	cout << endl;
