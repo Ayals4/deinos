@@ -38,9 +38,9 @@ std::ostream& chess::operator<<(std::ostream& os, Piece p)
 
 optional<Square> chess::Square::translate(int files,int ranks) const
 {
-	const int new_file = m_file + files;
+	const int new_file = file() + files;
 	if (new_file > 7 || new_file < 0) return nullopt;
-	const int new_rank = m_rank + ranks;
+	const int new_rank = rank() + ranks;
 	if (new_rank > 7 || new_rank < 0) return nullopt;
 
 	return optional<Square>(Square(new_file, new_rank));
@@ -50,7 +50,7 @@ chess::Square::operator string () const
 {
 	constexpr array<char, 8> files {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
 	constexpr array<char, 8> ranks {'1', '2', '3', '4', '5', '6', '7', '8'};
-	return string {files[m_file], ranks[m_rank]};
+	return string {files[file()], ranks[rank()]};
 }
 
 bool chess::operator==(Square s1, Square s2)

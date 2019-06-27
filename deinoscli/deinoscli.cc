@@ -100,7 +100,7 @@ int main() {
 	//assert(result);
 	//this_thread::sleep_for(100ms);
 
-	while (engine.total_n() < 1000) this_thread::sleep_for(10ms);
+	while (engine.total_n() < 10000) this_thread::sleep_for(10ms);
 	
 	cout << engine.display() << endl;
 }

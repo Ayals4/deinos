@@ -7,9 +7,10 @@
 #include <cassert>
 #include <iostream>
 #include <gsl/gsl_assert>
+#include <cstddef>
 
 namespace chess {
-	enum class Alignment {White, Black};
+	enum class Alignment : char {White, Black};
 	Alignment operator!(const Alignment& a);
 
 	enum class GameResult {White, Black, Draw};
@@ -27,14 +28,14 @@ namespace chess {
 
 	enum class Side {Kingside, Queenside};
 
-	enum class AlRes {White, Black, None}; //Utility to avoid constant Empty checks
+	enum class AlRes : char {White, Black, None}; //Utility to avoid constant Empty checks
 	inline bool operator==(AlRes ar, Alignment a) {return (int) ar == (int) a;}
 	inline bool operator==(Alignment a, AlRes ar) {return ar == a;}
 	inline bool operator!=(AlRes ar, Alignment a) {return !(ar == a);}
 	inline bool operator!=(Alignment a, AlRes ar) {return !(ar == a);}
 	
 	struct Piece {
-		enum class Type {Empty, Pawn, Knight, Bishop, Rook, Queen, King};
+		enum class Type : char {Empty, Pawn, Knight, Bishop, Rook, Queen, King};
 		
 		constexpr Piece() = default;
 		constexpr Piece(Alignment a, Type t) : alignment(a), type(t) {}
@@ -66,18 +67,27 @@ namespace chess {
 			}
 			assert(file != -1);
 			assert(rank != -1);
-			m_file = file;
-			m_rank = rank;
+			//m2_file = file;
+			//m2_rank = rank;
+			data = (std::byte{rank} << 4) | std::byte{file};
 		}
 		
 		std::optional<Square> translate(int files, int ranks) const;
-		inline int file() const {return m_file;}
-		inline int rank() const {return m_rank;}
+		//inline int file_old() const {return m2_file;}
+		//inline int rank_old() const {return m2_rank;}
+
+		inline uint8_t file() const {return std::to_integer<uint8_t>(data & std::byte{0x0F});}
+		inline uint8_t rank() const {return std::to_integer<uint8_t>((data & std::byte{0xF0}) >> 4);}
 		explicit operator std::string () const;
 	private:
-		constexpr Square(int file, int rank) : m_file(file), m_rank(rank) {}
-		int m_file = 0; //check ok to use short
-		int m_rank = 0;
+		constexpr Square(int file, int rank) : //m2_file(file), m2_rank(rank),
+		data((std::byte{rank} << 4) | std::byte{file}) {
+			//assert(this->file() == file_old());
+			//assert(this->rank() == rank_old());
+		}
+		//char m2_file = 0; //check ok to use short
+		//char m2_rank = 0;
+		std::byte data = std::byte{0};
 	};
 	bool operator==(Square, Square);
 	bool operator!=(Square, Square);

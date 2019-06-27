@@ -491,17 +491,17 @@ algorithm::TreeEngine::TreeEngine(
 				pause_count--;
 				pause_cv.notify_all();
 			}
-			if (total_n() > 1000) { //hacky bullshit
+			if (total_n() > 10000) { //hacky bullshit
 				continue;
 			}
-			for (int i = 0; i < 10; i++) m_tree.search(); //should be 1000
+			for (int i = 0; i < 100; i++) m_tree.search(); //should be 1000
 		}
 	};
 
 	m_threads.emplace_back(constant_search);
-	m_threads.emplace_back(constant_search);
-	m_threads.emplace_back(constant_search);
-	m_threads.emplace_back(constant_search);
+	//m_threads.emplace_back(constant_search);
+	//m_threads.emplace_back(constant_search);
+	//m_threads.emplace_back(constant_search);
 }
 
 /*void algorithm::TreeEngine::start()
