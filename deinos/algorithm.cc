@@ -12,7 +12,7 @@ void calculate_moves(const Position& pos, vector<Move>& output,
 	std::array<std::array<int, 8>, 8>& ctrl_out, Square start)
 {
 	const Piece moved = pos[start];
-	const Alignment to_move = moved.alignment;
+	const Alignment to_move = moved.alignment();
 
 	const auto register_move = [&](Square s_end)
 	{
@@ -63,7 +63,7 @@ void calculate_moves(const Position& pos, vector<Move>& output,
 		}
 	};
 		
-	switch (moved.type) {
+	switch (moved.type()) {
 		case Piece::Type::Empty: break;
 		
 		case Piece::Type::Pawn: {
@@ -78,7 +78,7 @@ void calculate_moves(const Position& pos, vector<Move>& output,
 				if (!new_s) continue;
 				const auto capt = pos[new_s.value()];
 				if (i == 0) {
-					if (capt.type != Piece::Type::Empty) continue;
+					if (capt.type() != Piece::Type::Empty) continue;
 				}
 				else {
 					register_control(new_s.value());
@@ -86,14 +86,14 @@ void calculate_moves(const Position& pos, vector<Move>& output,
 						register_en_passant(new_s.value());
 						continue;
 					}
-					if (capt.type == Piece::Type::Empty || capt.alignment == to_move) continue;
+					if (capt.type() == Piece::Type::Empty || capt.alignment() == to_move) continue;
 				}
 				if (can_pr) register_promotion(new_s.value());
 				else register_move(new_s.value());
 
 				if (dbl_mv && i == 0){ //double move
 					const auto new_s2 = start.translate(i,mvdir * 2).value(); //always valid
-					if (pos[new_s2].type != Piece::Type::Empty) continue;
+					if (pos[new_s2].type() != Piece::Type::Empty) continue;
 					register_move(new_s2);
 				}
 			}
@@ -198,9 +198,9 @@ algorithm::AnalysedPosition::AnalysedPosition(const chess::Position& t_pos)
 	: m_position(t_pos)
 {
 	for (Square s : all_squares) {
-		const int index = (int) m_position[s].alignment;
+		const int index = (int) m_position[s].alignment();
 		calculate_moves(t_pos, m_moves[index], m_control[index], s);
-		if (m_position[s].type == Piece::Type::King) m_king_sq[index] = s;
+		if (m_position[s].type() == Piece::Type::King) m_king_sq[index] = s;
 	}
 	//const int index = (int) t_pos.to_move();
 	//handle_en_passant(t_pos, m_moves[index], m_control[index]);

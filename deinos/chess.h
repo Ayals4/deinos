@@ -38,15 +38,32 @@ namespace chess {
 		enum class Type : char {Empty, Pawn, Knight, Bishop, Rook, Queen, King};
 		
 		constexpr Piece() = default;
-		constexpr Piece(Alignment a, Type t) : alignment(a), type(t) {}
+		constexpr Piece(Alignment a, Type t) : //m_alignment(a), m_type(t),
+		data((static_cast<std::byte>(t) << 1) | static_cast<std::byte>(a)) {}
 
 		inline AlRes almnt_res() const { //None if Empty, otherwise alignment
-			if (type == Type::Empty) return AlRes::None;
-			return (AlRes) ((int) alignment);
+			if (type() == Type::Empty) return AlRes::None;
+			return (AlRes) ((int) alignment());
 		}
-		
-		Alignment alignment = Alignment::White;
-		Type type = Type::Empty;
+
+		//inline Alignment alignment_old() const {return m_alignment;}
+		//inline Type type_old() const {return m_type;}
+
+		inline Alignment alignment() const {
+			const auto result = static_cast<Alignment>(data & std::byte{0b00000001});
+			//assert(alignment_old() == result);
+			return result;
+		}
+		inline Type type() const {
+			const auto result = static_cast<Type>(data >> 1);
+			//assert(type_old() == result);
+			return result;
+		}
+
+	private:
+		//Alignment m_alignment = Alignment::White;
+		//Type m_type = Type::Empty;
+		std::byte data = std::byte{0};
 	};
 	bool operator==(Piece, Piece);
 	bool operator!=(Piece, Piece);
@@ -120,7 +137,7 @@ namespace chess {
 		inline Piece captured_piece() const {return m_captured_piece;}
 		inline bool is_en_passant() const {return m_is_en_passant;}
 		inline bool is_castling() const {return m_is_castling;}
-		inline bool is_promotion() const {return m_promoted_to.type != Piece::Type::Empty;}
+		inline bool is_promotion() const {return m_promoted_to.type() != Piece::Type::Empty;}
 		inline Piece promoted_to() const {return m_promoted_to;}
 
 		explicit operator std::string() const;

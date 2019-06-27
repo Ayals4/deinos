@@ -12,7 +12,7 @@ Alignment chess::operator!(const Alignment& a)
 
 bool chess::operator==(Piece a, Piece b)
 {
-	return (a.alignment == b.alignment) && (a.type == b.type);
+	return (a.alignment() == b.alignment()) && (a.type() == b.type());
 }
 
 bool chess::operator!=(Piece a, Piece b)
@@ -31,8 +31,8 @@ std::ostream& chess::operator<<(std::ostream& os, Piece p)
 {
 	constexpr array<char, 7> white {' ', 'x', 'N', 'B', 'R', 'Q', 'K'};
 	constexpr array<char, 7> black {'@', 'o', 'n', 'b', 'r', 'q', 'k'};
-	if (p.alignment == Alignment::White) os << white[(int) p.type];
-	else os << black[(int) p.type];
+	if (p.alignment() == Alignment::White) os << white[(int) p.type()];
+	else os << black[(int) p.type()];
 	return os;
 }
 
@@ -66,9 +66,9 @@ bool chess::operator!=(Square s1, Square s2)
 chess::Move::Move(Square initial, Square final, Piece moved, Piece captured)
 	: m_initial_square(initial), m_final_square(final), m_moved_piece(moved), m_captured_piece(captured)
 {
-	Expects(m_moved_piece.type != Piece::Type::Empty);
-	Expects(m_captured_piece.type == Piece::Type::Empty ||
-		m_captured_piece.alignment != m_moved_piece.alignment);
+	Expects(m_moved_piece.type() != Piece::Type::Empty);
+	Expects(m_captured_piece.type() == Piece::Type::Empty ||
+		m_captured_piece.alignment() != m_moved_piece.alignment());
 }
 
 Square get_initial_sq(const string& name)
@@ -106,28 +106,28 @@ chess::Move::Move(const Position& pos, const string& name)
 		get_moved(pos, name), get_captured(pos, name)) {}
 
 void chess::Move::set_castling() {
-	Expects(m_moved_piece.type == Piece::Type::King);
-	Expects(m_captured_piece.type == Piece::Type::Empty);
+	Expects(m_moved_piece.type() == Piece::Type::King);
+	Expects(m_captured_piece.type() == Piece::Type::Empty);
 	Expects(m_is_castling == false);
 	m_is_castling = true;
 }
 
 void chess::Move::set_promotion(Piece::Type promo_type) {
-	Expects(m_moved_piece.type == Piece::Type::Pawn); //must be a pawn
+	Expects(m_moved_piece.type() == Piece::Type::Pawn); //must be a pawn
 	Expects(this->is_promotion() == false); //cannot already be a promotion
 	Expects(promo_type == Piece::Type::Knight ||
 		promo_type == Piece::Type::Bishop ||
 		promo_type == Piece::Type::Rook ||
 		promo_type == Piece::Type::Queen); //do not promote to King, Pawn or Empty
-	Expects((m_moved_piece.alignment == Alignment::White && m_final_square.rank() == 7)
-		|| (m_moved_piece.alignment == Alignment::Black && m_final_square.rank() == 0)); //promote on the right rank
+	Expects((m_moved_piece.alignment() == Alignment::White && m_final_square.rank() == 7)
+		|| (m_moved_piece.alignment() == Alignment::Black && m_final_square.rank() == 0)); //promote on the right rank
 	
-	m_promoted_to = Piece {m_moved_piece.alignment, promo_type};
+	m_promoted_to = Piece {m_moved_piece.alignment(), promo_type};
 }
 
 void chess::Move::set_en_passant() {
-	Expects(m_moved_piece.type == Piece::Type::Pawn);
-	Expects(m_captured_piece.type == Piece::Type::Pawn);
+	Expects(m_moved_piece.type() == Piece::Type::Pawn);
+	Expects(m_captured_piece.type() == Piece::Type::Pawn);
 	Expects(m_is_en_passant == false);
 	m_is_en_passant = true;
 }
@@ -135,7 +135,7 @@ void chess::Move::set_en_passant() {
 string chess::Move::to_xboard() const {
 	stringstream ss;
 	ss << (string) m_initial_square << (string) m_final_square;
-	if (is_promotion()) ss << m_promoted_to.type;
+	if (is_promotion()) ss << m_promoted_to.type();
 	return ss.str();
 }
 
@@ -164,10 +164,10 @@ chess::Move::operator string() const
 
 std::ostream& chess::operator<<(std::ostream& os, const Move& mv)
 {
-	os << mv.moved_piece().type << (string) mv.initial_square();
-	os << (mv.captured_piece().type == Piece::Type::Empty ? '-' : 'x');
+	os << mv.moved_piece().type() << (string) mv.initial_square();
+	os << (mv.captured_piece().type() == Piece::Type::Empty ? '-' : 'x');
 	os << (string) mv.final_square();
-	if (mv.promoted_to().type != Piece::Type::Empty) os << mv.promoted_to().type; 
+	if (mv.promoted_to().type() != Piece::Type::Empty) os << mv.promoted_to().type(); 
 	return os;
 }
 
@@ -229,7 +229,7 @@ chess::Position::Position(const string& fen)
 }
 
 void apply_castling(Position& pos, const Move& mv) {
-	const Alignment to_move = mv.moved_piece().alignment;
+	const Alignment to_move = mv.moved_piece().alignment();
 	const Square king_sq = (to_move == Alignment::White ? Square("e1") : Square("e8"));
 	const bool kingside = mv.final_square().file() > mv.initial_square().file();
 	const int king_dir = (kingside ? 1 : -1);
@@ -253,18 +253,18 @@ void apply_promotion(Position& pos, const Move& mv) {
 }
 
 chess::Position::Position(const Position& t_pos, const Move& mv)
-	: m_to_move(!mv.moved_piece().alignment), m_board(t_pos.m_board), m_castle(t_pos.m_castle),
+	: m_to_move(!mv.moved_piece().alignment()), m_board(t_pos.m_board), m_castle(t_pos.m_castle),
 	m_hm_clock(t_pos.m_hm_clock + 1), m_fm_count(t_pos.m_fm_count)
 {
 	//Expects(t_pos.game_result() == nullopt);
-	Expects(t_pos.to_move() == mv.moved_piece().alignment);
+	Expects(t_pos.to_move() == mv.moved_piece().alignment());
 	Expects(t_pos[mv.initial_square()] == mv.moved_piece());
 	if (!mv.is_en_passant()) Expects(t_pos[mv.final_square()] == mv.captured_piece());
 
 	//handle move clocks
 	if(to_move() == Alignment::White) m_fm_count += 1;
-	if(mv.captured_piece().type != Piece::Type::Empty) m_hm_clock = 0;
-	if(mv.moved_piece().type == Piece::Type::Pawn) m_hm_clock = 0;
+	if(mv.captured_piece().type() != Piece::Type::Empty) m_hm_clock = 0;
+	if(mv.moved_piece().type() == Piece::Type::Pawn) m_hm_clock = 0;
 
 	if (mv.is_castling()) {
 		apply_castling(*this, mv);
@@ -281,13 +281,13 @@ chess::Position::Position(const Position& t_pos, const Move& mv)
 	}
 
 	//check to disable castling
-	if (mv.moved_piece().type == Piece::Type::King && 
+	if (mv.moved_piece().type() == Piece::Type::King && 
 		(can_castle(t_pos.to_move(), Side::Kingside) ||
 		can_castle(t_pos.to_move(), Side::Queenside))) {
 		mut_castle(t_pos.to_move(), Side::Kingside) = false;
 		mut_castle(t_pos.to_move(), Side::Queenside) = false;
 	}
-	if (mv.moved_piece().type == Piece::Type::Rook) {
+	if (mv.moved_piece().type() == Piece::Type::Rook) {
 		if (can_castle(t_pos.to_move(), Side::Queenside) && mv.initial_square().file() == 0) {
 			mut_castle(t_pos.to_move(), Side::Queenside) = false;
 		}
@@ -295,7 +295,7 @@ chess::Position::Position(const Position& t_pos, const Move& mv)
 			mut_castle(t_pos.to_move(), Side::Kingside) = false;
 		}
 	}
-	if (mv.captured_piece().type == Piece::Type::Rook) {
+	if (mv.captured_piece().type() == Piece::Type::Rook) {
 		if (can_castle(!t_pos.to_move(), Side::Queenside) && mv.final_square().file() == 0) {
 			mut_castle(!t_pos.to_move(), Side::Queenside) = false;
 		}
@@ -305,7 +305,7 @@ chess::Position::Position(const Position& t_pos, const Move& mv)
 	}
 
 	//create en_passant_target
-	if (mv.moved_piece().type == Piece::Type::Pawn) {
+	if (mv.moved_piece().type() == Piece::Type::Pawn) {
 		const int rank_gap = mv.final_square().rank() - mv.initial_square().rank();
 		if (rank_gap == 2) m_en_passant_target = mv.initial_square().translate(0,1);
 		if (rank_gap == -2) m_en_passant_target = mv.initial_square().translate(0,-1);
@@ -338,7 +338,7 @@ string chess::Position::as_fen() const
 		int empty_counter = 0;
 		for (int f = 0; f < 8; f++) {
 			const Piece p = m_board[f][r];
-			if (p.type == Piece::Type::Empty) {
+			if (p.type() == Piece::Type::Empty) {
 				empty_counter += 1;
 				continue;
 			}
@@ -346,7 +346,7 @@ string chess::Position::as_fen() const
 				output += to_string(empty_counter);
 				empty_counter = 0;
 			}
-			output += (p.alignment == Alignment::White ? white[(int) p.type] : black[(int) p.type]);
+			output += (p.alignment() == Alignment::White ? white[(int) p.type()] : black[(int) p.type()]);
 		}
 		if (empty_counter != 0) {
 			output += to_string(empty_counter);
