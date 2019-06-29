@@ -12,6 +12,15 @@
 #include <future>
 #include <condition_variable>
 
+//memory consmption ideas:
+//can halve Move size by removing piece type tracking and putting boold inside promotion piece
+//can reduce AnalysedPosition size by doubling up control inside one byte
+//perhaps dynamically delete parts of the tree e.g. only positions and regenerate if necessary
+//deletion thread?
+
+//Other
+//use gsl::index in for loops?
+
 namespace algorithm {
 	class AnalysedPosition{
 	public:
@@ -31,7 +40,7 @@ namespace algorithm {
 	private:
 		std::array<chess::Square, 2> m_king_sq;
 		chess::Position m_position;
-		std::array<std::array<std::array<int, 8>, 8>, 2> m_control {0};
+		std::array<std::array<std::array<uint8_t, 8>, 8>, 2> m_control {0}; //can cut size in half using half a byte each for each side
 		std::array<std::vector<chess::Move>, 2> m_moves = {};
 	};
 	std::ostream& operator<<(std::ostream& os, const AnalysedPosition& ap);
@@ -61,6 +70,7 @@ namespace algorithm {
 		explicit Node(const AnalysedPosition& t_apos);
 		int preferred_index();
 		std::unique_ptr<Node>* find_child(const std::string& fen);
+		std::unique_ptr<Node>* find_child(const chess::Move& mv);
 		inline Node* child(int index) const {return edges[index].node.get();}
 		const chess::Move& best_move() {return apos->moves()[preferred_index()];}
 		inline std::optional<chess::GameResult> result() const {return m_result;}
@@ -103,40 +113,6 @@ namespace algorithm {
 		std::optional<int> edge_to_search(Node& node);
 	};
 
-	/*class Engine {
-	public:
-		virtual ~Engine() = default;
-		virtual void force_move(const chess::Move&) = 0;
-		virtual const chess::Move& best_move() const = 0;
-
-		//virtual const chess::Position& pos() const = 0;
-		//virtual const AnalysedPosition& apos() const = 0;
-		virtual const std::vector<chess::Move>& moves() const = 0;
-	};
-
-	class RandomEngine : public Engine {
-	public:
-		constexpr RandomEngine() = default;
-		void force_move(const chess::Move& mv) override;
-		const chess::Move& best_move() const override;
-
-		inline const chess::Position& pos() const override {return m_apos.pos();}
-		inline const AnalysedPosition& apos() const override {return m_apos;}
-		inline const std::vector<chess::Move>& moves() const override {return m_apos.moves();}
-		
-	private:
-		AnalysedPosition m_apos = AnalysedPosition(chess::Position::std_start());
-	};
-
-	class TreeEngine : public Engine {
-	public:
-		TreeEngine()
-		void force_move(const chess::Move& mv) override;
-		const chess::Move& best_move() const override;
-
-		
-	}*/
-
 	class TreeEngine {
 	public:
 		TreeEngine(
@@ -157,7 +133,8 @@ namespace algorithm {
 
 		//void start();
 		const chess::Move& choose_move(); //maybe add exploration?
-		bool advance_to(const std::string& fen);
+		bool advance_to(const std::string& fen); //TODO make lichess compatible
+		bool advance_by(const chess::Move& mv); //TODO
 		std::string display() const; //TODO
 
 		inline int total_n() const {return m_tree.base->total_n();};

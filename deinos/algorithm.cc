@@ -5,11 +5,12 @@
 #include <thread>
 #include <chrono>
 using namespace std;
+using namespace std::chrono_literals;
 using namespace chess;
 using namespace algorithm;
 
 void calculate_moves(const Position& pos, vector<Move>& output,
-	std::array<std::array<int, 8>, 8>& ctrl_out, Square start)
+	std::array<std::array<uint8_t, 8>, 8>& ctrl_out, Square start)
 {
 	const Piece moved = pos[start];
 	const Alignment to_move = moved.alignment();
@@ -164,36 +165,6 @@ void calculate_castling(const AnalysedPosition& apos, vector<Move>& output, Alig
 	}
 }
 
-void handle_en_passant(const Position& pos, vector<Move>& output, std::array<std::array<int, 8>, 8>& ctrl_out) { //TODO
-	/*if (!pos.prev_move()) return;
-	const Move& prev_move = pos.prev_move().value();
-	if (prev_move.moved_piece().type != Piece::Type::Pawn) return;
-	const int delta_rank = prev_move.final_square().rank() - prev_move.initial_square().rank();
-	if (delta_rank == 1 || delta_rank == -1) return;
-	const Alignment to_move = pos.to_move();
-	const int capt_dir = (to_move == Alignment::White ? 1 : -1);
-	const auto start1 = prev_move.final_square().translate(1, 0);
-	if (start1 && pos[start1.value()] == Piece(to_move, Piece::Type::Pawn)) {
-		const Square s_end = prev_move.final_square().translate(0, capt_dir).value();
-		output.push_back(Move(
-			start1.value(), s_end,
-			Piece(to_move, Piece::Type::Pawn),
-			Piece(!to_move, Piece::Type::Pawn)));
-		output.back().set_en_passant();
-		ctrl_out[s_end.file()][s_end.rank()] += 1;
-	}
-	const auto start2 = prev_move.final_square().translate(-1, 0);
-	if (start2 && pos[start2.value()] == Piece(to_move, Piece::Type::Pawn)) {
-		const Square s_end = prev_move.final_square().translate(0, capt_dir).value();
-		output.push_back(Move(
-			start2.value(), s_end,
-			Piece(to_move, Piece::Type::Pawn),
-			Piece(!to_move, Piece::Type::Pawn)));
-		output.back().set_en_passant();
-		ctrl_out[s_end.file()][s_end.rank()] += 1;
-	}*/
-}
-
 algorithm::AnalysedPosition::AnalysedPosition(const chess::Position& t_pos)
 	: m_position(t_pos)
 {
@@ -202,8 +173,6 @@ algorithm::AnalysedPosition::AnalysedPosition(const chess::Position& t_pos)
 		calculate_moves(t_pos, m_moves[index], m_control[index], s);
 		if (m_position[s].type() == Piece::Type::King) m_king_sq[index] = s;
 	}
-	//const int index = (int) t_pos.to_move();
-	//handle_en_passant(t_pos, m_moves[index], m_control[index]);
 	calculate_castling(*this, m_moves[0], Alignment::White);
 	calculate_castling(*this, m_moves[1], Alignment::Black);
 }
@@ -262,32 +231,7 @@ algorithm::Node::Node(const AnalysedPosition& t_apos)
 	white_to_play(apos->pos().to_move() == Alignment::White),
 	data(apos->moves().size()),
 	edges(vector<Edge>(apos->moves().size()))
-	{
-	}
-
-/*variant<Node*, double> algorithm::Node::follow(int index, function<double(const AnalysedPosition&)> value_fn) {
-	edges[index].ptr_mutex.lock();
-	if (edges[index].node != nullptr) {
-		edges[index].ptr_mutex.unlock();
-		return edges[index].node.get();
-	}
-	else {
-		const Move& m = apos->moves()[index];
-		AnalysedPosition new_apos(Position(apos->pos(), m));
-		const double value = value_fn(new_apos);
-		edges[index].node = make_unique<Node>(move(new_apos));
-		edges[index].ptr_mutex.unlock();
-		return value;
-	}
-}
-
-void algorithm::Node::update(int index, double t_value) {
-	data_mutex.lock();
-	data.total_n += 1;
-	data.edges[index].visits += 1;
-	data.edges[index].total_value += t_value;
-	data_mutex.unlock();
-}*/
+	{}
 
 void algorithm::Node::increment_n() {
 	data_mutex.lock();
@@ -310,11 +254,29 @@ int algorithm::Node::preferred_index()
 	return (int) max_loc;
 }
 
-unique_ptr<Node>* algorithm::Node::find_child(const std::string& fen)
+bool equal_bar_ep (const string & fen1, const string & fen2)
+{
+	stringstream ss1(fen1);
+	stringstream ss2(fen2);
+
+	for (int i = 0; i < 6; i++) {
+		string word1;
+		ss1 >> word1;
+		string word2;
+		ss2 >> word2;
+		if (i == 3) continue;
+		if (word1 != word2) return false;
+	}
+	return true;
+}
+
+unique_ptr<Node>* algorithm::Node::find_child(const string& fen)
 {
 	for (auto& edge : edges) {
 		if (edge.node) {
-			if (edge.node->apos->pos().as_fen() == fen) {
+			//cerr << edge.node->apos->pos().as_fen() << " --VS-- " << fen << endl;
+			if (equal_bar_ep(edge.node->apos->pos().as_fen(), fen)) {
+				//assert(equal_bar_ep(edge.node->apos->pos().as_fen(), fen)); //verify new function
 				return &edge.node;
 			}
 		}
@@ -322,20 +284,41 @@ unique_ptr<Node>* algorithm::Node::find_child(const std::string& fen)
 	return nullptr;
 }
 
-//const Move& algorithm::Node::best_move() {
-//	return apos->moves()[preferred_index()];
-//}
+unique_ptr<Node>* algorithm::Node::find_child(const Move& mv)
+{
+	for (int i = 0; i < (int) edges.size(); i++) {
+		if (edges[i].node) {
+			if (apos->moves()[i] == mv) {
+				//assert(equal_bar_ep(edge.node->apos->pos().as_fen(), fen)); //verify new function
+				return &edges[i].node;
+			}
+		}
+	}
+	return nullptr;
+}
 
 optional<int> algorithm::Tree::edge_to_search(Node& node) { //need to make change with alignment TODO
+	node.data_mutex.lock();
+	//hacky code to fix search impotence while winning
+	float node_avg = 0.0; 
+	for (const auto& ed : node.data.edges) {
+		if (!ed.legal) continue;
+		node_avg += ed.total_value;
+	}
+	node_avg /= node.data.total_n;
+	float margin = 0.5 - abs(node_avg - 0.5);
+	if (margin == 0.0) margin = 0.5;
+	//cerr << node_avg << " <:> " << margin << endl;
+
 	const auto evaluate = [&](const EdgeDatum& ed) {
 		if (!ed.legal) return -1.0f;
 		const float avg_val = ed.total_value / ((float) ed.visits + 0.01f);
 		const float oriented_val = (node.white_to_play ? avg_val : 1.0f - avg_val);
-		const float expl = expl_c * sqrt(node.data.total_n) / (1 + ed.visits);
+		const float expl = expl_c * sqrt(node.data.total_n) / (1 + ed.visits) * 2.0 * margin;
 		return oriented_val + expl;
 	};
 
-	node.data_mutex.lock();
+	
 	const auto& vec = node.data.edges;
 	unsigned int i = 0;
 	unsigned int max_pos = i;
@@ -392,20 +375,6 @@ string algorithm::Node::display() const
 	return output.str();
 }
 
-/*double search_node(Node* node, const function<double(const AnalysedPosition&)>& value_fn) {
-	if (node->result) {
-		node->increment_n();
-		return node->result.value();
-	}
-	//Expects(node->apos->pos().game_result() == nullopt);
-	const int index_to_search = node->to_search();
-	const auto follow_result = node->follow(index_to_search, value_fn);
-	const double value = (follow_result.index() == 1 ?
-		get<double>(follow_result) : search_node(get<Node*>(follow_result), value_fn));
-	node->update(index_to_search, value);
-	return value;
-}*/
-
 float algorithm::Tree::evaluate_node(Node& node)
 {
 	//if result determined return
@@ -460,28 +429,12 @@ void algorithm::Tree::search()
 	if (base) evaluate_node(*base);
 }
 
-/*void algorithm::RandomEngine::force_move(const chess::Move& mv)
-{
-	m_apos = AnalysedPosition(Position(m_apos.pos(), mv));
-}
-
-const Move& algorithm::RandomEngine::best_move() const
-{
-	Expects(!m_apos.moves().empty());
-	for (const Move& m : m_apos.moves()) {
-		AnalysedPosition new_apos(Position(m_apos.pos(), m));
-		if (new_apos.ctrl(new_apos.pos().to_move(), new_apos.king_sq(m_apos.pos().to_move())) <= 0) return m;
-	}
-	return m_apos.moves().front();
-}*/
-
 algorithm::TreeEngine::TreeEngine(
 	const AnalysedPosition& t_apos,
 	function<float(const AnalysedPosition&)> t_value_fn,
 	function<float(const AnalysedPosition&, const Move&)> t_prior_fn,
 	float t_expl_c
 )	: m_tree(Tree(t_apos, t_value_fn, t_prior_fn, t_expl_c))
-	//halt_future(halt_promise.get_future())
 {
 	shared_future<void> halt_future(halt_promise.get_future());
 
@@ -495,36 +448,21 @@ algorithm::TreeEngine::TreeEngine(
 				pause_count--;
 				pause_cv.notify_all();
 			}
-			if (total_n() > 10000) { //hacky bullshit
+			if (total_n() > 2000000) { //hacky "solution" to avoid running out of ram
+				this_thread::sleep_for(1ms);
 				continue;
 			}
-			for (int i = 0; i < 100; i++) m_tree.search(); //should be 1000
+			for (int i = 0; i < 1000; i++) m_tree.search(); //should be 1000
 		}
 	};
 
 	m_threads.emplace_back(constant_search);
-	//m_threads.emplace_back(constant_search);
-	//m_threads.emplace_back(constant_search);
-	//m_threads.emplace_back(constant_search);
+	m_threads.emplace_back(constant_search);
+	m_threads.emplace_back(constant_search);
+	m_threads.emplace_back(constant_search);
+
+	cerr << "Initial fen: " << m_tree.base->apos->pos().as_fen() << endl;
 }
-
-/*void algorithm::TreeEngine::start()
-{
-	const auto constant_search = [&] () {
-		while (true) m_tree.search();
-	};
-
-	thread t(constant_search);
-	t.detach();
-	thread t2(constant_search);
-	t2.detach();
-	thread t3(constant_search);
-	t3.detach();
-	thread t4(constant_search);
-	t4.detach();
-	
-	cout << "!engine started!" << endl;
-}*/
 
 const Move& algorithm::TreeEngine::choose_move()
 {
@@ -546,6 +484,20 @@ bool algorithm::TreeEngine::advance_to(const string& fen)
 	}
 }
 
+bool algorithm::TreeEngine::advance_by(const Move& mv)
+{
+	pause();
+	unique_ptr<Node>* next_ptr = m_tree.base->find_child(mv);
+	if (next_ptr) {
+		m_tree.base = move(*next_ptr);
+		resume();
+		return true;
+	}
+	else {
+		resume();
+		return false;
+	}
+}
 string algorithm::TreeEngine::display() const
 {
 	stringstream output;

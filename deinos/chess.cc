@@ -358,10 +358,12 @@ string chess::Position::as_fen() const
 	output += (to_move() == Alignment::White ? " w" : " b");
 
 	output += ' ';
-	if (can_castle(Alignment::White, Side::Kingside)) output += 'K';
-	if (can_castle(Alignment::White, Side::Queenside)) output += 'Q';
-	if (can_castle(Alignment::Black, Side::Kingside)) output += 'k';
-	if (can_castle(Alignment::Black, Side::Queenside)) output += 'q';
+	bool no_castling = true;
+	if (can_castle(Alignment::White, Side::Kingside)) {output += 'K'; no_castling = false;}
+	if (can_castle(Alignment::White, Side::Queenside)) {output += 'Q'; no_castling = false;}
+	if (can_castle(Alignment::Black, Side::Kingside)) {output += 'k'; no_castling = false;}
+	if (can_castle(Alignment::Black, Side::Queenside)) {output += 'q'; no_castling = false;}
+	if (no_castling) output += '-';
 
 	output += ' ';
 	if(en_passant_target()) output += (string) en_passant_target().value();
