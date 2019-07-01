@@ -28,11 +28,11 @@ namespace algorithm {
 		explicit AnalysedPosition(const chess::Position&); //generate from scratch
 
 		inline const chess::Position& pos() const {return m_position;}
-		inline int ctrl(chess::Alignment a, chess::Square s) const {return m_control[(int) a][s.file()][s.rank()];}
-		inline const std::vector<chess::Move>& moves(chess::Alignment a) const {return m_moves[(int) a];}
+		inline int ctrl(chess::Almnt a, chess::Square s) const {return m_control[(int) a][s.file()][s.rank()];}
+		inline const std::vector<chess::Move>& moves(chess::Almnt a) const {return m_moves[(int) a];}
 		inline const std::vector<chess::Move>& moves() const {return moves(pos().to_move());}
-		inline const chess::Square king_sq(chess::Alignment a) const {return m_king_sq[(int) a];}
-		inline bool in_check(chess::Alignment a) const {return ctrl(!a, king_sq(a)) > 0;}
+		inline const chess::Square king_sq(chess::Almnt a) const {return m_king_sq[(int) a];}
+		inline bool in_check(chess::Almnt a) const {return ctrl(!a, king_sq(a)) > 0;}
 		inline bool legal_check() const {return in_check(pos().to_move());}
 		inline bool illegal_check() const {return in_check(!pos().to_move());}
 		friend std::ostream& operator<<(std::ostream& os, const AnalysedPosition& ap);

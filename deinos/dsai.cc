@@ -14,16 +14,16 @@ float dsai::material_vf(const AnalysedPosition& ap)
 	float ctrl_dif = 0.0f;
 
 	for(Square s : all_squares) {
-		const Piece p = pos[s];
-		totals[static_cast<uint8_t>(p.alignment())] += values[static_cast<uint8_t>(p.type())];
-		ctrl_dif += ap.ctrl(Alignment::White, s);
-		ctrl_dif -= ap.ctrl(Alignment::Black, s);
+		const Piece p = pos.at(s);
+		totals[static_cast<uint8_t>(p.almnt())] += values[static_cast<uint8_t>(p.type())];
+		ctrl_dif += ap.ctrl(Almnt::White, s);
+		ctrl_dif -= ap.ctrl(Almnt::Black, s);
 	}
 
 	float king_ctrl_adj = 0.0;
 	const float total_dif = totals[0] - totals[1];
-	if (total_dif > 10.0f) king_ctrl_adj += king_ctrl_score(ap, Alignment::White);
-	if (total_dif < -10.0f) king_ctrl_adj -= king_ctrl_score(ap, Alignment::Black);
+	if (total_dif > 10.0f) king_ctrl_adj += king_ctrl_score(ap, Almnt::White);
+	if (total_dif < -10.0f) king_ctrl_adj -= king_ctrl_score(ap, Almnt::Black);
 
 	constexpr float gain = 0.3f;
 	const float weight = totals[0] - totals[1] + ctrl_dif * 0.05f + king_ctrl_adj;
@@ -48,9 +48,9 @@ float dsai::material_vf(const AnalysedPosition& ap)
 	return totals[0] - totals[1];
 }*/
 
-float dsai::king_ctrl_score(const AnalysedPosition& ap, const Alignment a)
+float dsai::king_ctrl_score(const AnalysedPosition& ap, const Almnt a)
 {
-	const auto& pos = ap.pos();
+	//const auto& pos = ap.pos();
 	const Square ksq = ap.king_sq(!a);
 	
 	constexpr array<pair<int, int>, 8> trans {

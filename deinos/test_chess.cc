@@ -3,194 +3,158 @@
 #include <string>
 #include <optional>
 using namespace std;
+using namespace chess;
 
-TEST(AlignmentTest, First)
+TEST(AlignmentTest, Inversion)
 {
-	auto w = chess::Alignment::White;
-	auto b = chess::Alignment::Black;
+	auto w = Almnt::White;
+	auto b = Almnt::Black;
 	EXPECT_EQ(!w, b);
 	EXPECT_EQ(!b, w);
 }
 
+TEST(AlResTest, AlmntComp)
+{
+	EXPECT_EQ(Almnt::White, AlRes::White);
+	EXPECT_NE(Almnt::Black, AlRes::White);
+	EXPECT_NE(Almnt::Black, AlRes::None);
+}
+
+TEST(GameResultTest, Evaluation)
+{
+	EXPECT_EQ(evaluate(GameResult::White), 1.0f);
+	EXPECT_EQ(evaluate(GameResult::Black), 0.0f);
+	EXPECT_EQ(evaluate(GameResult::Draw), 0.5f);
+}
+
 TEST(PieceTest, DefaultConstructor)
 {
-	chess::Piece default_piece;
-	chess::Piece intended {chess::Alignment::White, chess::Piece::Type::Empty};
+	Piece default_piece;
+	Piece intended {Almnt::White, Piece::Type::Empty};
 	EXPECT_EQ(default_piece, intended);
+	EXPECT_EQ(default_piece.almnt_res(), AlRes::None);
+}
+
+TEST(PieceTest, Construction)
+{
+	Piece w_bishop(Almnt::White, Piece::Type::Bishop);
+	EXPECT_EQ(w_bishop.type(), Piece::Type::Bishop);
+	EXPECT_EQ(w_bishop.almnt(), Almnt::White);
+	EXPECT_EQ(w_bishop.almnt_res(), AlRes::White);
+	Piece b_king(Almnt::Black, Piece::Type::King);
+	EXPECT_EQ(b_king.type(), Piece::Type::King);
+	EXPECT_EQ(b_king.almnt(), Almnt::Black);
+	EXPECT_EQ(b_king.almnt_res(), AlRes::Black);
 }
 
 TEST(SquareTest, DefaultConstructor)
 {
-	chess::Square s;
+	Square s;
 	EXPECT_EQ(s.file(), 0);
 	EXPECT_EQ(s.rank(), 0);
 }
 
 TEST(SquareTest, ConversionToString)
 {
-	chess::Square sq;
+	Square sq;
 	EXPECT_EQ((string) sq, (string) "a1");
 }
 
 TEST(SquareTest, ConstructFromZString)
 {
-	chess::Square sq("c4");
+	Square sq("c4");
 	EXPECT_EQ(sq.file(), 2);
 	EXPECT_EQ(sq.rank(), 3);
 }
 
 TEST(SquareTest, Translate)
 {
-	chess::Square sq("c4");
+	Square sq("c4");
 	auto sq2 = sq.translate(2, -3).value();
-	EXPECT_EQ(sq2, chess::Square("e1"));
+	EXPECT_EQ(sq2, Square("e1"));
 }
 
 TEST(SquareTest, TranslateOffBoard)
 {
-	chess::Square sq("c4");
+	Square sq("c4");
 	auto sq2 = sq.translate(-1, 5);
 	EXPECT_EQ(sq2, nullopt);
 }
 
 TEST(SquareTest, AllSquares)
 {
-	EXPECT_EQ(chess::all_squares[0], chess::Square("a1"));
-	EXPECT_EQ(chess::all_squares[7], chess::Square("h1"));
-	EXPECT_EQ(chess::all_squares[56], chess::Square("a8"));
-	EXPECT_EQ(chess::all_squares[63], chess::Square("h8"));
+	EXPECT_EQ(all_squares[0], Square("a1"));
+	EXPECT_EQ(all_squares[7], Square("h1"));
+	EXPECT_EQ(all_squares[56], Square("a8"));
+	EXPECT_EQ(all_squares[63], Square("h8"));
 }
 
-TEST(MoveTestDeathTest, DefaultConstructor)
+TEST(MoveRecordTest, Normal)
 {
-	chess::Move defmv;
-	EXPECT_EQ(defmv.initial_square(), chess::Square("a1"));
-	EXPECT_EQ(defmv.final_square(), chess::Square("a1"));
-	EXPECT_EQ(defmv.moved_piece(), chess::Piece());
-	EXPECT_EQ(defmv.captured_piece(), chess::Piece());
-	EXPECT_FALSE(defmv.is_en_passant());
-	EXPECT_FALSE(defmv.is_castling());
-	EXPECT_FALSE(defmv.is_promotion());
+	MoveRecord mr("e2", "e4");
+	EXPECT_EQ(mr.initial(), Square("e2"));
+	EXPECT_EQ(mr.final(), Square("e4"));
+	EXPECT_FALSE(mr.is_promo());
+	EXPECT_EQ(mr.promo_type(), nullopt);
 }
 
-//still need to check construction of en passant and castling
-TEST(MoveTestDeathTest, StringConstructor)
+TEST(MoveRecordTest, Promotion)
 {
-	auto pos = chess::Position::std_start();
-	string name = "Pe2-e4";
-	chess::Move mv(pos, name);
-	EXPECT_EQ((string) mv, name);
+	MoveRecord mr("c7", "c8", Piece::Type::Rook);
+	EXPECT_EQ(mr.initial(), Square("c7"));
+	EXPECT_EQ(mr.final(), Square("c8"));
+	EXPECT_TRUE(mr.is_promo());
+	EXPECT_EQ(mr.promo_type().value(), Piece::Type::Rook);
+	EXPECT_THROW(MoveRecord("h7", "h8", Piece::Type::King), std::invalid_argument);
+	EXPECT_THROW(MoveRecord("h7", "h8", Piece::Type::Pawn), std::invalid_argument);
 }
 
-TEST(MoveTestDeathTest, SetCastling)
+TEST(HalfByteBoardTest, Indexing)
 {
-	chess::Move mv(chess::Square("a1"), chess::Square("a2"),
-		chess::Piece {chess::Alignment::White, chess::Piece::Type::King}, chess::Piece());
-	EXPECT_FALSE(mv.is_castling()); //initially false
-	mv.set_castling();
-	EXPECT_TRUE(mv.is_castling()); //now true
-	EXPECT_DEATH(mv.set_castling(), ""); //cannot set again
-
-	chess::Move mv2(chess::Square("a1"), chess::Square("a2"),
-		chess::Piece {chess::Alignment::White, chess::Piece::Type::Rook}, chess::Piece());
-	EXPECT_DEATH(mv2.set_castling(), ""); //must be a king
-
-	chess::Move mv3(chess::Square("a1"), chess::Square("a2"),
-			chess::Piece {chess::Alignment::White, chess::Piece::Type::King},
-			chess::Piece {chess::Alignment::Black, chess::Piece::Type::Pawn});
-		EXPECT_DEATH(mv3.set_castling(), ""); //cannot capture
-}
-
-TEST(MoveTestDeathTest, SetPromotion)
-{
-	chess::Move mv(chess::Square("a2"), chess::Square("a1"),
-		chess::Piece {chess::Alignment::Black, chess::Piece::Type::Pawn}, chess::Piece());
-	EXPECT_FALSE(mv.is_promotion()); //initially false
-	EXPECT_DEATH(mv.set_promotion(chess::Piece::Type::King), ""); //cannot promote to king
-	EXPECT_DEATH(mv.set_promotion(chess::Piece::Type::Pawn), ""); //cannot promote to pawn
-	mv.set_promotion(chess::Piece::Type::Knight);
-	chess::Piece expected {chess::Alignment::Black, chess::Piece::Type::Knight};
-	EXPECT_EQ(mv.promoted_to(), expected);
-	EXPECT_DEATH(mv.set_promotion(chess::Piece::Type::Knight), ""); //cannot set again
-
-	chess::Move mv2(chess::Square("a2"), chess::Square("a1"),
-		chess::Piece {chess::Alignment::Black, chess::Piece::Type::Bishop}, chess::Piece());
-	EXPECT_DEATH(mv2.set_promotion(chess::Piece::Type::Knight), ""); //can only promote a pawn
-
-	chess::Move mv3(chess::Square("a2"), chess::Square("a1"),
-		chess::Piece {chess::Alignment::White, chess::Piece::Type::Pawn}, chess::Piece());
-	EXPECT_DEATH(mv3.set_promotion(chess::Piece::Type::Knight), ""); //white promotes on rank 8
-
-	chess::Move mv4(chess::Square("a3"), chess::Square("a2"),
-		chess::Piece {chess::Alignment::Black, chess::Piece::Type::Pawn}, chess::Piece());
-	EXPECT_DEATH(mv4.set_promotion(chess::Piece::Type::Knight), ""); //black promotes on rank 1
-}
-
-TEST(MoveTestDeathTest, SetEnPassant)
-{
-	chess::Move mv(chess::Square("e5"), chess::Square("f6"),
-		chess::Piece {chess::Alignment::White, chess::Piece::Type::Pawn},
-		chess::Piece {chess::Alignment::Black, chess::Piece::Type::Pawn});
-	EXPECT_FALSE(mv.is_en_passant()); //initially false
-	mv.set_en_passant();
-	EXPECT_TRUE(mv.is_en_passant()); //now true
-	EXPECT_DEATH(mv.set_en_passant(), ""); //cannot set again
-
-	chess::Move mv2(chess::Square("e5"), chess::Square("f6"),
-		chess::Piece {chess::Alignment::White, chess::Piece::Type::Knight},
-		chess::Piece {chess::Alignment::Black, chess::Piece::Type::Pawn});
-	EXPECT_DEATH(mv2.set_en_passant(), ""); //must be a pawn
-
-	chess::Move mv3(chess::Square("e5"), chess::Square("f6"),
-		chess::Piece {chess::Alignment::White, chess::Piece::Type::Pawn},
-		chess::Piece {chess::Alignment::Black, chess::Piece::Type::Rook});
-	EXPECT_DEATH(mv3.set_en_passant(), ""); //must capture a pawn
-
-	chess::Move mv4(chess::Square("e5"), chess::Square("f6"),
-		chess::Piece {chess::Alignment::White, chess::Piece::Type::Pawn},
-		chess::Piece());
-	EXPECT_DEATH(mv4.set_en_passant(), ""); //must capture a pawn
-}
-
-TEST(MoveTestDeathTest, StringOperator)
-{
-	chess::Move mv(chess::Square("e2"), chess::Square("e4"),
-		chess::Piece {chess::Alignment::White, chess::Piece::Type::Pawn}, chess::Piece());
-	EXPECT_EQ((string) mv, "Pe2-e4");
+	HalfByteBoard hbb;
+	EXPECT_EQ(hbb.get(0), 0);
+	EXPECT_EQ(hbb.get(62), 0);
+	EXPECT_EQ(hbb.get(63), 0);
+	hbb.set(6, 7, 15);
+	EXPECT_EQ(hbb.get(62), 15);
+	EXPECT_EQ(hbb.get(63), 0);
+	hbb.set(63, 6);
+	EXPECT_EQ(hbb.get(62), 15);
+	EXPECT_EQ(hbb.get(63), 6);
 }
 
 TEST(PositionTest, FenConstruction)
 {
-	chess::Position pos("r3kb1r/1bq2ppp/p1kppk2/8/1p1NP3/P1N1BP2/1PPQB1PP/2KR3R w kq - 0 12");
+	Position pos("r3kb1r/1bq2ppp/p1nppn2/8/1p1NP3/P1N1BP2/1PPQB1PP/2KR3R w kq - 0 12");
 	cerr << pos << endl;
-	EXPECT_EQ(pos.as_fen(), "r3kb1r/1bq2ppp/p1kppk2/8/1p1NP3/P1N1BP2/1PPQB1PP/2KR3R w kq - 0 12");
+	EXPECT_EQ(pos.as_fen(), "r3kb1r/1bq2ppp/p1nppn2/8/1p1NP3/P1N1BP2/1PPQB1PP/2KR3R w kq - 0 12");
 }
 
 TEST(PositionTest, ToMove)
 {
-	chess::Position defpos = chess::Position::std_start();
-	EXPECT_EQ(defpos.to_move(), chess::Alignment::White);
-	chess::Move mv(chess::Square("e2"), chess::Square("e4"),
-		chess::Piece {chess::Alignment::White, chess::Piece::Type::Pawn}, chess::Piece());
-	defpos = chess::Position(defpos, mv);
-	EXPECT_EQ(defpos.to_move(), chess::Alignment::Black);
+	Position defpos = Position::std_start();
+	EXPECT_EQ(defpos.to_move(), Almnt::White);
+	MoveRecord mr{"e2", "e4"};
+	Move mv(defpos, mr);
+	defpos = Position(defpos, mv);
+	EXPECT_EQ(defpos.to_move(), Almnt::Black);
 }
 
 TEST(PositionTest, Indexing)
 {
-	chess::Position pos;
-	EXPECT_EQ(pos["c3"], chess::Piece());
-	chess::Piece new_p {chess::Alignment::White, chess::Piece::Type::King};
-	pos["c3"] = new_p;
+	Position pos;
+	EXPECT_EQ(pos.at("c3"), Piece());
+	Piece new_p {Almnt::White, Piece::Type::King};
+	pos.set("c3", new_p);
 	const auto pos2 = pos;
-	EXPECT_EQ(pos2["c3"], new_p);
+	EXPECT_EQ(pos2.at("c3"), new_p);
 }
 
 TEST(PositionTest, CastleFlags)
 {
-	chess::Position pos;
-	auto a = chess::Alignment::White;
-	auto s = chess::Side::Kingside;
+	Position pos;
+	auto a = Almnt::White;
+	auto s = Side::Kingside;
 	EXPECT_FALSE(pos.can_castle(a, s));
 	pos.mut_castle(a, s) = true;
 	EXPECT_TRUE(pos.can_castle(a, s));
@@ -198,21 +162,109 @@ TEST(PositionTest, CastleFlags)
 
 TEST(PositionTest, AsFen)
 {
-	auto pos = chess::Position::std_start();
+	auto pos = Position::std_start();
 	EXPECT_EQ(pos.as_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 }
 
 TEST(PositionTest, AsFenOpening)
 {
-	auto pos = chess::Position::std_start();
+	auto pos = Position::std_start();
 	EXPECT_EQ(pos.as_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-	chess::Move mv1(pos, "Pe2-e4");
-	pos = chess::Position(pos, mv1);
+	MoveRecord mr1{"e2", "e4"};
+	Move mv1(pos, mr1);
+	pos = Position(pos, mv1);
 	EXPECT_EQ(pos.as_fen(), "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
-	chess::Move mv2(pos, "Pc7-c5");
-	pos = chess::Position(pos, mv2);
+	MoveRecord mr2{"c7", "c5"};
+	Move mv2(pos, mr2);
+	pos = Position(pos, mv2);
 	EXPECT_EQ(pos.as_fen(), "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2");
-	chess::Move mv3(pos, "Ng1-f3");
-	pos = chess::Position(pos, mv3);
+	MoveRecord mr3{"g1", "f3"};
+	Move mv3(pos, mr3);
+	pos = Position(pos, mv3);
 	EXPECT_EQ(pos.as_fen(), "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2");
+}
+
+TEST(MoveTest, Normal)
+{
+	auto pos = Position::std_start();
+	MoveRecord mr {"e2", "e4"};
+	Move mv {pos, mr};
+	EXPECT_EQ(mv.initial_sq(), "e2");
+	EXPECT_EQ(mv.final_sq(), "e4");
+	EXPECT_EQ(mv.moved(), Piece(Almnt::White, Piece::Type::Pawn));
+	EXPECT_EQ(mv.captured(), Piece());
+	EXPECT_FALSE(mv.is_en_passant());
+	EXPECT_FALSE(mv.is_castling());
+	EXPECT_FALSE(mv.is_promotion());
+}
+
+TEST(MoveTest, PawnCapture)
+{
+	Position pos{"rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2"};
+	MoveRecord mr {"e4", "d5"};
+	Move mv {pos, mr};
+	EXPECT_EQ(mv.initial_sq(), "e4");
+	EXPECT_EQ(mv.final_sq(), "d5");
+	EXPECT_EQ(mv.moved(), Piece(Almnt::White, Piece::Type::Pawn));
+	EXPECT_EQ(mv.captured(), Piece(Almnt::Black, Piece::Type::Pawn));
+	EXPECT_FALSE(mv.is_en_passant());
+	EXPECT_FALSE(mv.is_castling());
+	EXPECT_FALSE(mv.is_promotion());
+}
+
+TEST(MoveTest, PieceCapture)
+{
+	Position pos{"rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2"};
+	MoveRecord mr {"d8", "d5"};
+	Move mv {pos, mr};
+	EXPECT_EQ(mv.initial_sq(), "d8");
+	EXPECT_EQ(mv.final_sq(), "d5");
+	EXPECT_EQ(mv.moved(), Piece(Almnt::Black, Piece::Type::Queen));
+	EXPECT_EQ(mv.captured(), Piece(Almnt::White, Piece::Type::Pawn));
+	EXPECT_FALSE(mv.is_en_passant());
+	EXPECT_FALSE(mv.is_castling());
+	EXPECT_FALSE(mv.is_promotion());
+}
+
+TEST(MoveTest, EnPassant)
+{
+	Position pos{"rnbqkbnr/pp2pppp/8/2pP4/8/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 3"};
+	MoveRecord mr {"d5", "c6"};
+	Move mv {pos, mr};
+	EXPECT_EQ(mv.initial_sq(), "d5");
+	EXPECT_EQ(mv.final_sq(), "c6");
+	EXPECT_EQ(mv.moved(), Piece(Almnt::White, Piece::Type::Pawn));
+	EXPECT_EQ(mv.captured(), Piece());
+	EXPECT_TRUE(mv.is_en_passant());
+	EXPECT_FALSE(mv.is_castling());
+	EXPECT_FALSE(mv.is_promotion());
+}
+
+TEST(MoveTest, Promotion)
+{
+	Position pos{"r2qkbnr/pP2pppp/2n5/5b2/8/8/PPPP1PPP/RNBQKBNR w KQkq - 1 5"};
+	MoveRecord mr {"b7", "a8", Piece::Type::Queen};
+	Move mv {pos, mr};
+	EXPECT_EQ(mv.initial_sq(), "b7");
+	EXPECT_EQ(mv.final_sq(), "a8");
+	EXPECT_EQ(mv.moved(), Piece(Almnt::White, Piece::Type::Pawn));
+	EXPECT_EQ(mv.captured(), Piece(Almnt::Black, Piece::Type::Rook));
+	EXPECT_FALSE(mv.is_en_passant());
+	EXPECT_FALSE(mv.is_castling());
+	EXPECT_TRUE(mv.is_promotion());
+	EXPECT_EQ(mv.promo_type().value(), Piece::Type::Queen);
+}
+
+TEST(MoveTest, Castling)
+{
+	Position pos{"r2qkbnr/pp1n1ppp/3pp3/2p5/4P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 0 6"};
+	MoveRecord mr {"e1", "g1"};
+	Move mv {pos, mr};
+	EXPECT_EQ(mv.initial_sq(), "e1");
+	EXPECT_EQ(mv.final_sq(), "g1");
+	EXPECT_EQ(mv.moved(), Piece(Almnt::White, Piece::Type::King));
+	EXPECT_EQ(mv.captured(), Piece());
+	EXPECT_FALSE(mv.is_en_passant());
+	EXPECT_TRUE(mv.is_castling());
+	EXPECT_FALSE(mv.is_promotion());
 }

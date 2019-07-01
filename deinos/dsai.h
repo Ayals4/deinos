@@ -14,7 +14,7 @@ namespace dsai {
 
 	float material_vf(const algorithm::AnalysedPosition& ap);
 	float material_score(const algorithm::AnalysedPosition& ap);
-	float king_ctrl_score(const algorithm::AnalysedPosition& ap, chess::Alignment a);
+	float king_ctrl_score(const algorithm::AnalysedPosition& ap, chess::Almnt a);
 
 	float test_vf(const algorithm::AnalysedPosition& ap);
 }

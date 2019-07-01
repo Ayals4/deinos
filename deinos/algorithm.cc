@@ -12,8 +12,8 @@ using namespace algorithm;
 void calculate_moves(const Position& pos, vector<Move>& output,
 	std::array<std::array<uint8_t, 8>, 8>& ctrl_out, Square start)
 {
-	const Piece moved = pos[start];
-	const Alignment to_move = moved.alignment();
+	/*const Piece moved = pos[start];
+	const Almnt to_move = moved.almnt();
 
 	const auto register_move = [&](Square s_end)
 	{
@@ -68,9 +68,9 @@ void calculate_moves(const Position& pos, vector<Move>& output,
 		case Piece::Type::Empty: break;
 		
 		case Piece::Type::Pawn: {
-			const int mvdir = (to_move == Alignment::White ? 1 : -1);
-			const int init_rnk = (to_move == Alignment::White ? 1 : 6);
-			const int pr_rnk = (to_move == Alignment::White ? 6 : 1);
+			const int mvdir = (to_move == Almnt::White ? 1 : -1);
+			const int init_rnk = (to_move == Almnt::White ? 1 : 6);
+			const int pr_rnk = (to_move == Almnt::White ? 6 : 1);
 			const bool dbl_mv = start.rank() == init_rnk;
 			const bool can_pr = start.rank() == pr_rnk;
 
@@ -87,7 +87,7 @@ void calculate_moves(const Position& pos, vector<Move>& output,
 						register_en_passant(new_s.value());
 						continue;
 					}
-					if (capt.type() == Piece::Type::Empty || capt.alignment() == to_move) continue;
+					if (capt.type() == Piece::Type::Empty || capt.almnt() == to_move) continue;
 				}
 				if (can_pr) register_promotion(new_s.value());
 				else register_move(new_s.value());
@@ -105,21 +105,21 @@ void calculate_moves(const Position& pos, vector<Move>& output,
 		case Piece::Type::Queen: apply_tmpl(strt_tmpl, true); apply_tmpl(diag_tmpl, true); break;
 		case Piece::Type::Rook: apply_tmpl(strt_tmpl, true); break;
 		case Piece::Type::Bishop: apply_tmpl(diag_tmpl, true); break;
-	}
+	}*/
 }
 
-void calculate_castling(const AnalysedPosition& apos, vector<Move>& output, Alignment to_move) {
-	constexpr Piece WKing = Piece(Alignment::White, Piece::Type::King);
-	constexpr Piece WRook = Piece(Alignment::White, Piece::Type::Rook);
-	constexpr Piece BKing = Piece(Alignment::Black, Piece::Type::King);
-	constexpr Piece BRook = Piece(Alignment::Black, Piece::Type::Rook);
+void calculate_castling(const AnalysedPosition& apos, vector<Move>& output, Almnt to_move) {
+	/*constexpr Piece WKing = Piece(Almnt::White, Piece::Type::King);
+	constexpr Piece WRook = Piece(Almnt::White, Piece::Type::Rook);
+	constexpr Piece BKing = Piece(Almnt::Black, Piece::Type::King);
+	constexpr Piece BRook = Piece(Almnt::Black, Piece::Type::Rook);
 	constexpr Piece Empty = Piece();
-	constexpr Alignment Wt = Alignment::White;
-	constexpr Alignment Bk = Alignment::Black;
+	constexpr Almnt Wt = Almnt::White;
+	constexpr Almnt Bk = Almnt::Black;
 	const Position& pos = apos.pos();
 	switch (to_move) { //sanitise somehow by factoring? TODO
-		case Alignment::White: {
-			if (pos.can_castle(Alignment::White, Side::Queenside)) {
+		case Almnt::White: {
+			if (pos.can_castle(Almnt::White, Side::Queenside)) {
 				Expects(pos["e1"] == WKing);
 				Expects(pos["a1"] == WRook);
 				if (pos["b1"] == Empty && pos["c1"] == Empty && pos["d1"] == Empty &&
@@ -129,7 +129,7 @@ void calculate_castling(const AnalysedPosition& apos, vector<Move>& output, Alig
 					output.push_back(m);
 				}
 			}
-			if (pos.can_castle(Alignment::White, Side::Kingside)) {
+			if (pos.can_castle(Almnt::White, Side::Kingside)) {
 				Expects(pos["e1"] == WKing);
 				Expects(pos["h1"] == WRook);
 				if (pos["f1"] == Empty && pos["g1"] == Empty &&
@@ -140,8 +140,8 @@ void calculate_castling(const AnalysedPosition& apos, vector<Move>& output, Alig
 				}
 			}
 		} break;
-		case Alignment::Black: {
-			if (pos.can_castle(Alignment::Black, Side::Queenside)) {
+		case Almnt::Black: {
+			if (pos.can_castle(Almnt::Black, Side::Queenside)) {
 				Expects(pos["e8"] == BKing);
 				Expects(pos["a8"] == BRook);
 				if (pos["b8"] == Empty && pos["c8"] == Empty && pos["d8"] == Empty &&
@@ -151,7 +151,7 @@ void calculate_castling(const AnalysedPosition& apos, vector<Move>& output, Alig
 					output.push_back(m);
 				}
 			}
-			if (pos.can_castle(Alignment::Black, Side::Kingside)) {
+			if (pos.can_castle(Almnt::Black, Side::Kingside)) {
 				Expects(pos["e8"] == BKing);
 				Expects(pos["h8"] == BRook);
 				if (pos["f8"] == Empty && pos["g8"] == Empty &&
@@ -162,25 +162,25 @@ void calculate_castling(const AnalysedPosition& apos, vector<Move>& output, Alig
 				}
 			}
 		} break;
-	}
+	}*/
 }
 
 algorithm::AnalysedPosition::AnalysedPosition(const chess::Position& t_pos)
 	: m_position(t_pos)
 {
 	for (Square s : all_squares) {
-		const int index = (int) m_position[s].alignment();
+		const int index = (int) m_position.at(s).almnt();
 		calculate_moves(t_pos, m_moves[index], m_control[index], s);
-		if (m_position[s].type() == Piece::Type::King) m_king_sq[index] = s;
+		if (m_position.at(s).type() == Piece::Type::King) m_king_sq[index] = s;
 	}
-	calculate_castling(*this, m_moves[0], Alignment::White);
-	calculate_castling(*this, m_moves[1], Alignment::Black);
+	calculate_castling(*this, m_moves[0], Almnt::White);
+	calculate_castling(*this, m_moves[1], Almnt::Black);
 }
 
 ostream& algorithm::operator<<(ostream& os, const AnalysedPosition& ap)
 {
-	const auto w = Alignment::White;
-	const auto b = Alignment::Black;
+	const auto w = Almnt::White;
+	const auto b = Almnt::Black;
 	const auto k = Side::Kingside;
 	const auto q = Side::Queenside;
 	os << "Cast: " << (ap.pos().can_castle(w,k) ? "Y" : "N") << " ";
@@ -190,13 +190,13 @@ ostream& algorithm::operator<<(ostream& os, const AnalysedPosition& ap)
 	os << "    Prev: ";
 	//if (ap.pos().prev_move()) os << ap.pos().prev_move().value();
 	os << "???   ";
-	os << "     To Move: " << (ap.pos().to_move() == Alignment::White ? "White" : "Black") << endl;
+	os << "     To Move: " << (ap.pos().to_move() == Almnt::White ? "White" : "Black") << endl;
 	
 	constexpr const char* hline = "-------------------------------------------------";
 	os << hline <<endl;
 	for (int i = 7; i >= 0; i--) {
 		for (int j = 0; j < 8; j++) {
-			os << "|  " << ap.m_position[chess::all_squares[j + i * 8]] << "  ";
+			os << "|  " << ap.m_position.at(chess::all_squares[j + i * 8]) << "  ";
 		}
 		os << "|" << endl;
 		for (int j = 0; j < 8; j++) {
@@ -221,14 +221,14 @@ ostream& algorithm::operator<<(ostream& os, const AnalysedPosition& ap)
 
 algorithm::Node::Node(unique_ptr<const AnalysedPosition> t_apos)
 	: apos(move(t_apos)),
-	white_to_play(apos->pos().to_move() == Alignment::White),
+	white_to_play(apos->pos().to_move() == Almnt::White),
 	data(apos->moves().size()),
 	edges(vector<Edge>(apos->moves().size()))
 	{}
 
 algorithm::Node::Node(const AnalysedPosition& t_apos)
 	: apos(make_unique<AnalysedPosition>(t_apos)),
-	white_to_play(apos->pos().to_move() == Alignment::White),
+	white_to_play(apos->pos().to_move() == Almnt::White),
 	data(apos->moves().size()),
 	edges(vector<Edge>(apos->moves().size()))
 	{}
@@ -297,7 +297,7 @@ unique_ptr<Node>* algorithm::Node::find_child(const Move& mv)
 	return nullptr;
 }
 
-optional<int> algorithm::Tree::edge_to_search(Node& node) { //need to make change with alignment TODO
+optional<int> algorithm::Tree::edge_to_search(Node& node) { //need to make change with almnt TODO
 	node.data_mutex.lock();
 	//hacky code to fix search impotence while winning
 	float node_avg = 0.0; 
@@ -387,7 +387,7 @@ float algorithm::Tree::evaluate_node(Node& node)
 	const auto search_res = edge_to_search(node);
 	if (!search_res) {
 		if (node.apos->legal_check()) {
-			node.m_result = make_optional<GameResult>(gmres_victory(!node.apos->pos().to_move()));
+			node.m_result = make_optional<GameResult>(victory(!node.apos->pos().to_move()));
 		}
 		else {
 			node.m_result = make_optional<GameResult>(GameResult::Draw);
