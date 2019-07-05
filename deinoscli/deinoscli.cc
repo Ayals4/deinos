@@ -100,7 +100,7 @@ int main() {
 	cout << engine.display() << endl;
 
 	//engine.start();
-	this_thread::sleep_for(5000ms);
+	this_thread::sleep_for(1000ms);
 	//bool result = engine.advance_to("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
 	//assert(result);
 	//this_thread::sleep_for(500ms);
@@ -108,4 +108,8 @@ int main() {
 	//while (engine.total_n() < 10000) this_thread::sleep_for(10ms);
 	
 	cout << engine.display() << endl;
+
+	cout << "sizeof AnPos: " << sizeof(AnalysedPosition) << endl;
+	cout << "sizeof Node: " << sizeof(Node) << endl;
+	cout << "sizeof Edge: " << sizeof(Edge) << endl;
 }

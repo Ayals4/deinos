@@ -28,3 +28,11 @@ cc_test(
 		"@gtest//:gtest_main",
 	],
 )
+
+cc_binary(
+	name = "deinos_bench",
+	srcs = ["deinos_bench.cc"],
+	deps = [
+		":deinos"
+	],
+)

@@ -32,7 +32,7 @@ int main() {
 		}
 		if (input == "go") {
 			//cerr << "GO ACKNOWLEDGED" << endl;
-			this_thread::sleep_for(5000ms);
+			this_thread::sleep_for(20000ms);
 			//cerr << engine->display();
 			Move to_make = engine->choose_move();
 			cerr << engine->display();

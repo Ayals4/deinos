@@ -101,6 +101,7 @@ namespace chess {
 		constexpr Square(std::byte d) : data(d) {} //construct from raw data
 		std::byte data = std::byte{0};
 		friend class MoveRecord;
+		friend bool operator==(Square, Square);
 	};
 	bool operator==(Square, Square);
 	bool operator!=(Square, Square);
@@ -119,9 +120,12 @@ namespace chess {
 	//stores information necessary to reconstruct a move from a position
 	struct MoveRecord {
 	private:
-		constexpr static std::array<Piece::Type, 4> promo_types {Piece::Type::Knight, Piece::Type::Bishop, Piece::Type::Rook, Piece::Type::Queen};
+		
 		inline uint8_t promo_index() const {return static_cast<uint8_t>(data2) >> 6;}		
 	public:
+		constexpr static std::array<Piece::Type, 4> promo_types
+			{Piece::Type::Knight, Piece::Type::Bishop, Piece::Type::Rook, Piece::Type::Queen};
+		
 		static_assert(sizeof(Square) == 1);
 		constexpr MoveRecord(Square t_initial, Square t_final)
 			: data1(reinterpret_cast<std::byte&>(t_initial)), data2(reinterpret_cast<std::byte&>(t_final)) {}
@@ -134,12 +138,14 @@ namespace chess {
 		{
 			return is_promo() ? std::make_optional<Piece::Type>(promo_types[promo_index()]) : std::nullopt;
 		};
+		std::string to_string() const;
 	private:
 		std::byte data1 = std::byte{0}; //initial square and promotion existence flag
 		std::byte data2 = std::byte{0}; //final square and promotion type flag
 	};
 	bool operator==(const MoveRecord&, const MoveRecord&);
 	inline bool operator!=(const MoveRecord& mr1, const MoveRecord& mr2) {return !(mr1 == mr2);}
+	inline std::ostream& operator<<(std::ostream& os, const MoveRecord& mr) {os << mr.to_string(); return os;}
 
 	//64 half-byte uints stored in 32B
 	struct HalfByteBoard {
@@ -184,10 +190,14 @@ namespace chess {
 		//inline Piece& operator[] (Square s) {return m_board[s.file()][s.rank()];}
 		//inline Piece operator[] (Square s) const {return m_board[s.file()][s.rank()];}
 		inline Piece at(Square s) const {return Piece(m_board.get(s.file(), s.rank()));}
+		//inline Piece at(Square s) const {return m_board[s.file()][s.rank()];}
 		inline Piece at(int index) const {return Piece(m_board.get(index));}
+		//inline Piece at(int index) const {return m_board[index % 8][index / 8];}
 		inline void set(Square s, Piece p) {m_board.set(s.file(), s.rank(), p.raw());}
+		//inline void set(Square s, Piece p) {m_board[s.file()][s.rank()] = p;}
 		inline void set(int index, Piece p) {m_board.set(index, p.raw());}
-		inline bool can_castle(Almnt a, Side s) const {return m_castle[(int) a][(int) s];}
+		//inline void set(int index, Piece p) {m_board[index % 8][index / 8] = p;}
+		inline bool can_castle(Almnt a, Side s) const {return m_castle[(int) a][(int) s];} //TODO use as_index
 		inline bool& mut_castle(Almnt a, Side s){return m_castle[(int) a][(int) s];}
 		inline Almnt to_move() const {return m_to_move;}
 		inline std::optional<Square> en_passant_target() const {return m_en_passant_target;}
@@ -202,8 +212,8 @@ namespace chess {
 	private:
 		static_assert(sizeof(Piece) == 1);
 		HalfByteBoard m_board;
-		Almnt m_to_move = Almnt::White;
 		//std::array<std::array<Piece, 8>, 8> m_board = {Piece()};
+		Almnt m_to_move = Almnt::White;
 		std::array<std::array<bool, 2>, 2> m_castle = {{false}}; //"permitted to castle" flags indexed by enum values
 		//std::optional<GameResult> m_result = std::nullopt;
 		std::optional<Square> m_en_passant_target = std::nullopt;
@@ -225,6 +235,8 @@ namespace chess {
 		//void set_promotion(Piece::Type); //pawn promotion
 		//void set_en_passant(); //en_passant
 		constexpr Move(const Position& t_pos, const MoveRecord& t_record) : m_pos(t_pos), m_record(t_record) {
+			if (moved().type() == Piece::Type::Empty) {std::cerr << *this << std::endl << t_pos << std::endl; throw std::exception();}
+			if (captured().almnt_res() == moved().almnt()) {std::cerr << *this << " capt: " << captured() << " mr: " << m_record << std::endl << t_pos << std::endl; throw std::exception();}
 			assert(moved().type() != Piece::Type::Empty);
 			assert(captured().almnt_res() != moved().almnt());
 		}
@@ -244,6 +256,8 @@ namespace chess {
 		inline bool is_promotion() const {return m_record.is_promo();}
 		//inline Piece promoted_to() const {return m_promoted_to;}
 		inline std::optional<Piece::Type> promo_type() const {return m_record.promo_type();}
+		inline const MoveRecord& record() const {return m_record;}
+		inline Position apply() const {return Position(m_pos, *this);}
 
 		explicit operator std::string() const;
 		friend std::ostream& operator<<(std::ostream& os, const Move& mv);
@@ -264,7 +278,7 @@ namespace chess {
 	bool operator==(const Move&, const Move&);
 	bool operator!=(const Move&, const Move&);
 	std::ostream& operator<<(std::ostream& os, const Move& mv);
-	//std::optional<Move> find_move(const std::string& t_name, const std::vector<Move>& moves);
+	//std::optional<Move> find_move(const std::string& t_name, const AnalysedPosition& apos);
 
 	//std::optional<Move> move_from_fen(const std::string& fen, const Position& curr_pos, const std::vector<Move>& moves);
 }

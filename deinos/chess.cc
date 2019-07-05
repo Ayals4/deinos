@@ -52,7 +52,8 @@ chess::Square::operator string () const
 
 bool chess::operator==(Square s1, Square s2)
 {
-	return (s1.file() == s2.file()) && (s1.rank() == s2.rank());
+	//return (s1.file() == s2.file()) && (s1.rank() == s2.rank());
+	return (s1.data == s2.data);
 }
 
 bool chess::operator!=(Square s1, Square s2)
@@ -70,6 +71,15 @@ chess::MoveRecord::MoveRecord(Square t_initial, Square t_final, Piece::Type t_pr
 		}
 	}
 	if (!is_promo()) throw std::invalid_argument("Piece::Type passed is not a valid promotion candidate.");
+}
+
+string chess::MoveRecord::to_string() const
+{
+	stringstream ss;
+	ss << (string) initial();
+	ss << (string) final();
+	if (promo_type()) ss << promo_type().value();
+	return ss.str();
 }
 
 bool chess::operator==(const MoveRecord& mr1, const MoveRecord& mr2)
@@ -126,13 +136,10 @@ std::ostream& chess::operator<<(std::ostream& os, const Move& mv)
 	return os;
 }
 
-/*optional<Move> chess::find_move(const string& t_name, const vector<Move>& moves)
+/*optional<Move> chess::find_move(const string& t_name, const AnalysedPosition& apos)
 {
-	for (const auto& m : moves){
-		stringstream ss;
-		ss << m;
-		string name = ss.str();
-		if (name == t_name) return make_optional(m);
+	for (const auto& mr : apos.moves()){
+		if (mr.to_string() == t_name) return Move(apos.pos(), mr);
 	}
 	return nullopt;
 }*/

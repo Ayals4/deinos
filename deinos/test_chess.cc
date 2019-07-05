@@ -109,6 +109,12 @@ TEST(MoveRecordTest, Promotion)
 	EXPECT_THROW(MoveRecord("h7", "h8", Piece::Type::Pawn), std::invalid_argument);
 }
 
+TEST(MoveRecordTest, ToString)
+{
+	MoveRecord mr("c7", "c8", Piece::Type::Rook);
+	EXPECT_EQ(mr.to_string(), "c7c8R");
+}
+
 TEST(HalfByteBoardTest, Indexing)
 {
 	HalfByteBoard hbb;

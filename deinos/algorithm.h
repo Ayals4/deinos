@@ -27,21 +27,32 @@ namespace algorithm {
 		constexpr AnalysedPosition() = default;
 		explicit AnalysedPosition(const chess::Position&); //generate from scratch
 
+		void advance_by(chess::MoveRecord);
+		struct occlusion_info {
+			std::array<std::array<chess::Square, 16>, 2> squares;
+			std::array<int, 2> counts = {0};
+		};
+		AnalysedPosition::occlusion_info get_occlusion(chess::MoveRecord);
+
 		inline const chess::Position& pos() const {return m_position;}
-		inline int ctrl(chess::Almnt a, chess::Square s) const {return m_control[(int) a][s.file()][s.rank()];}
-		inline const std::vector<chess::Move>& moves(chess::Almnt a) const {return m_moves[(int) a];}
-		inline const std::vector<chess::Move>& moves() const {return moves(pos().to_move());}
-		inline const chess::Square king_sq(chess::Almnt a) const {return m_king_sq[(int) a];}
+		inline uint8_t ctrl(chess::Almnt a, chess::Square s) const {return m_control[chess::as_index(a)].get(s.file(), s.rank());}
+		inline const std::vector<chess::MoveRecord>& moves(chess::Almnt a) const {return m_moves[chess::as_index(a)];}
+		inline const std::vector<chess::MoveRecord>& moves() const {return moves(pos().to_move());}
+		inline chess::Move get_move(int index) const {return chess::Move(pos(), moves().at(index));}
+		inline const chess::Square king_sq(chess::Almnt a) const {return m_king_sq[chess::as_index(a)];}
 		inline bool in_check(chess::Almnt a) const {return ctrl(!a, king_sq(a)) > 0;}
 		inline bool legal_check() const {return in_check(pos().to_move());}
 		inline bool illegal_check() const {return in_check(!pos().to_move());}
+		std::optional<chess::Move> find_record(const std::string& name) const;
 		friend std::ostream& operator<<(std::ostream& os, const AnalysedPosition& ap);
 		
 	private:
+		void append_calculation(chess::Square start); //calculate data associated with this square and append to state (for initialisation)
+		void append_castling();
 		std::array<chess::Square, 2> m_king_sq;
 		chess::Position m_position;
-		std::array<std::array<std::array<uint8_t, 8>, 8>, 2> m_control {0}; //can cut size in half using half a byte each for each side
-		std::array<std::vector<chess::Move>, 2> m_moves = {};
+		std::array<chess::HalfByteBoard, 2> m_control;
+		std::array<std::vector<chess::MoveRecord>, 2> m_moves = {};
 	};
 	std::ostream& operator<<(std::ostream& os, const AnalysedPosition& ap);
 
@@ -49,6 +60,10 @@ namespace algorithm {
 	
 	struct Edge {
 		//std::mutex ptr_mutex;
+		float total_value;
+		int visits = 0;
+		//bool legal = true;
+		inline bool legal() const {return visits != -1;}
 		std::unique_ptr<Node> node = nullptr;
 	};
 
@@ -72,12 +87,12 @@ namespace algorithm {
 		std::unique_ptr<Node>* find_child(const std::string& fen);
 		std::unique_ptr<Node>* find_child(const chess::Move& mv);
 		inline Node* child(int index) const {return edges[index].node.get();}
-		const chess::Move& best_move() {return apos->moves()[preferred_index()];}
+		const chess::Move best_move() {return chess::Move(apos->pos(), apos->moves()[preferred_index()]);}
 		inline std::optional<chess::GameResult> result() const {return m_result;}
 		//inline int res_dist() const {return m_res_dist;} //TODO
 		std::string display() const;
 
-		inline int total_n() const {return data.total_n;} //synchronise?
+		inline int total_n() const {return m_total_n;} //synchronise?
 		
 		const std::unique_ptr<const AnalysedPosition> apos;
 		const bool white_to_play;
@@ -89,9 +104,14 @@ namespace algorithm {
 	
 		std::optional<chess::GameResult> m_result = std::nullopt;
 		//int m_res_dist = 0; //TODO
-		std::mutex data_mutex;
-		EdgeData data;
+		//std::mutex data_mutex2;
+		//EdgeData data;
+		int m_total_n = 1;
 		std::vector<Edge> edges;
+		//std::vector<Edge> edges2;
+		std::mutex data_mutex; //40B
+
+		std::array<uint8_t, 3> node_prefetch = {0};
 		
 		friend class Tree;
 	};
@@ -101,7 +121,7 @@ namespace algorithm {
 		Tree(const AnalysedPosition& base_apos, std::function<float(const AnalysedPosition&)> t_value_fn,
 			std::function<float(const AnalysedPosition&, const chess::Move&)> t_prior_fn, float t_expl_c = 0.2)			
 			: base(std::make_unique<Node>(base_apos)), value_fn(t_value_fn), prior_fn(t_prior_fn), expl_c(t_expl_c) {}
-		void search();
+		void search(bool update_prefetch = false);
 		std::unique_ptr<Node> base;
 		std::function<float(const AnalysedPosition&)> value_fn;
 		std::function<float(const AnalysedPosition&, const chess::Move&)> prior_fn;
@@ -111,6 +131,7 @@ namespace algorithm {
 		float evaluate_node(Node& node); //used in search() for recursion
 		void update_node(int index, float t_value);
 		std::optional<int> edge_to_search(Node& node);
+		void update_prefetch(Node& node);
 	};
 
 	class TreeEngine {
@@ -132,8 +153,8 @@ namespace algorithm {
 		TreeEngine& operator=(TreeEngine&&) = delete;
 
 		//void start();
-		const chess::Move& choose_move(); //maybe add exploration?
-		bool advance_to(const std::string& fen); //TODO make lichess compatible
+		const chess::Move choose_move(); //maybe add exploration?
+		bool advance_to(const std::string& fen);
 		bool advance_by(const chess::Move& mv); //TODO
 		std::string display() const; //TODO
 
